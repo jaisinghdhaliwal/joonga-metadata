@@ -37,10 +37,62 @@ jobs:
             throw 'UI smoke test timed out.'
           }
           if ($process.ExitCode -ne 0) { throw "UI smoke test failed: $($process.ExitCode)" }
+      - name: Smoke test Windows 11 installer UI and silent install/uninstall
+        if: matrix.runtime == 'win-x64'
+        shell: pwsh
+        run: |
+          $setup = Join-Path $PWD 'build/Joonga-Metadata-Windows-win-x64-Setup.exe'
+          $setupSmoke = Start-Process $setup -ArgumentList '--smoke-test' -PassThru
+          if (-not $setupSmoke.WaitForExit(120000)) {
+            Stop-Process -Id $setupSmoke.Id -ErrorAction SilentlyContinue
+            throw 'Installer UI smoke test timed out.'
+          }
+          if ($setupSmoke.ExitCode -ne 0) { throw "Installer UI smoke test failed: $($setupSmoke.ExitCode)" }
+          $installerResults = Join-Path $PWD 'build/InstallerSmokeResults'
+          $targetResults = Join-Path $PWD 'build/win-x64/Joonga Metadata/SmokeResults/Installer'
+          if (Test-Path -LiteralPath $installerResults) {
+            New-Item -ItemType Directory -Force $targetResults | Out-Null
+            Copy-Item -Path (Join-Path $installerResults '*') -Destination $targetResults -Recurse -Force
+          }
+
+          $installDir = Join-Path $env:RUNNER_TEMP 'JoongaMetadataInstallTest'
+          if (Test-Path -LiteralPath $installDir) { Remove-Item -LiteralPath $installDir -Recurse -Force }
+          $installProc = Start-Process $setup -ArgumentList @('--quiet', '--install', '--dir', "`"$installDir`"", '--scope', 'user', '--start-menu', 'true', '--desktop', 'false') -PassThru
+          if (-not $installProc.WaitForExit(120000)) {
+            Stop-Process -Id $installProc.Id -ErrorAction SilentlyContinue
+            throw 'Silent install timed out.'
+          }
+          if ($installProc.ExitCode -ne 0) { throw "Silent install failed: $($installProc.ExitCode)" }
+
+          $installedExe = Join-Path $installDir 'Joonga Metadata.exe'
+          $installedExif = Join-Path $installDir 'tools\exiftool.exe'
+          $startMenuShortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Joonga Metadata.lnk'
+          $regPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\JoongaMetadata'
+          if (-not (Test-Path -LiteralPath $installedExe)) { throw 'Installed executable missing.' }
+          if (-not (Test-Path -LiteralPath $installedExif)) { throw 'Installed ExifTool missing.' }
+          if (-not (Test-Path -LiteralPath $startMenuShortcut)) { throw 'Start Menu shortcut missing.' }
+          if (-not (Test-Path -LiteralPath $regPath)) { throw 'Uninstall registry entry missing.' }
+
+          $uninstallProc = Start-Process $installedExe -ArgumentList @('--uninstall', '--quiet') -PassThru
+          if (-not $uninstallProc.WaitForExit(120000)) {
+            Stop-Process -Id $uninstallProc.Id -ErrorAction SilentlyContinue
+            throw 'Silent uninstall timed out.'
+          }
+          if ($uninstallProc.ExitCode -ne 0) { throw "Silent uninstall failed: $($uninstallProc.ExitCode)" }
+
+          $deadline = (Get-Date).AddSeconds(20)
+          while ((Test-Path -LiteralPath $installDir) -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Milliseconds 500
+          }
+          if (Test-Path -LiteralPath $startMenuShortcut) { throw 'Start Menu shortcut was not removed.' }
+          if (Test-Path -LiteralPath $regPath) { throw 'Uninstall registry entry was not removed.' }
+          if (Test-Path -LiteralPath $installDir) { throw 'Install directory was not removed.' }
       - uses: actions/upload-artifact@v4
         with:
           name: Joonga-Metadata-Windows-${{ matrix.runtime }}
-          path: windows/build/Joonga-Metadata-Windows-${{ matrix.runtime }}.zip
+          path: |
+            windows/build/Joonga-Metadata-Windows-${{ matrix.runtime }}.zip
+            windows/build/Joonga-Metadata-Windows-${{ matrix.runtime }}-Setup.exe
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: matrix.runtime == 'win-x64' && always()

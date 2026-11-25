@@ -2,6 +2,7 @@
 param(
     [ValidateSet('win-x64','win-arm64')][string]$Runtime = 'win-x64',
     [switch]$SkipTests,
+    [switch]$SkipInstaller,
     [string]$ExifToolFolder
 )
 $ErrorActionPreference = 'Stop'
@@ -58,4 +59,20 @@ try {
     $zip = Join-Path $PSScriptRoot "build/Joonga-Metadata-Windows-${Runtime}.zip"
     Compress-Archive -Path $output -DestinationPath $zip -Force
     Write-Host "Ready: $zip"
+    if (-not $SkipInstaller) {
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $payloadZip = Join-Path $PSScriptRoot "build/$Runtime/payload.zip"
+        if (Test-Path -LiteralPath $payloadZip) { Remove-Item -LiteralPath $payloadZip -Force }
+        [System.IO.Compression.ZipFile]::CreateFromDirectory(
+            $output,
+            $payloadZip,
+            [System.IO.Compression.CompressionLevel]::Optimal,
+            $false)
+        $installerOut = Join-Path $PSScriptRoot "build/$Runtime/installer"
+        dotnet publish MetadataTransfer.Installer/MetadataTransfer.Installer.csproj -c Release -r $Runtime --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true "-p:InstallerPayloadPath=$payloadZip" -o $installerOut
+        if ($LASTEXITCODE -ne 0) { throw 'Windows installer build failed.' }
+        $setupExe = Join-Path $PSScriptRoot "build/Joonga-Metadata-Windows-${Runtime}-Setup.exe"
+        Copy-Item -LiteralPath (Join-Path $installerOut 'Joonga Metadata Setup.exe') -Destination $setupExe -Force
+        Write-Host "Ready: $setupExe"
+    }
 } finally { Pop-Location }

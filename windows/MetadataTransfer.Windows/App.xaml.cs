@@ -6,6 +6,19 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (e.Args.Contains("--uninstall", StringComparer.OrdinalIgnoreCase))
+        {
+            if (e.Args.Contains("--quiet", StringComparer.OrdinalIgnoreCase))
+            {
+                int code = UninstallWindow.RunSilent(e.Args);
+                Shutdown(code);
+                return;
+            }
+            var uninstallWindow = new UninstallWindow();
+            MainWindow = uninstallWindow;
+            uninstallWindow.Show();
+            return;
+        }
         var smoke=e.Args.Contains("--smoke-test");
         DispatcherUnhandledException += (_, args) =>
         {

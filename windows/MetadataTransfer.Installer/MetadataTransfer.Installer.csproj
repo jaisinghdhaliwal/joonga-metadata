@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup>
+  <OutputType>WinExe</OutputType>
+  <TargetFramework>net10.0-windows</TargetFramework>
+  <UseWPF>true</UseWPF>
+  <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  <AssemblyName>Joonga Metadata Setup</AssemblyName>
+  <Product>Joonga Metadata Setup</Product>
+  <RootNamespace>MetadataTransfer.Installer</RootNamespace>
+  <ApplicationIcon>../MetadataTransfer.Windows/Assets/AppIcon.ico</ApplicationIcon>
+  <ApplicationManifest>app.manifest</ApplicationManifest>
+  <NoWarn>$(NoWarn);WPF0001</NoWarn>
+  <Version>0.9.2</Version>
+  <FileVersion>0.9.2.0</FileVersion>
+  <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+ </PropertyGroup>
+ <ItemGroup>
+  <Resource Include="../MetadataTransfer.Windows/Assets/AppIcon.ico" Link="Assets/AppIcon.ico" />
+ </ItemGroup>
+ <ItemGroup>
+  <EmbeddedResource Include="$(InstallerPayloadPath)" LogicalName="JoongaMetadata.Payload.zip" Condition="'$(InstallerPayloadPath)' != '' and Exists('$(InstallerPayloadPath)')" />
+ </ItemGroup>
+</Project>

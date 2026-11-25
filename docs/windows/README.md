@@ -2,8 +2,14 @@
 
 A native Windows metadata editor and transfer utility, built with C#, .NET 10 WPF, Microsoft's Fluent controls and the Windows 11 Mica backdrop. It follows the system's light, dark, accent and high-contrast settings. The title bar puts app commands alongside the window controls. Drag the space between command groups to move the window, or double-click it to maximise or restore.
 
-## Run
+## Install or Run
 
+**Installer (recommended):**
+1. Choose **Joonga-Metadata-*-Windows-x64-Setup.exe** for Intel/AMD PCs, or **Joonga-Metadata-*-Windows-arm64-Setup.exe** for Windows on ARM.
+2. Run the Windows 11 Setup wizard to install to `Program Files\Joonga Metadata` (all users), `%LocalAppData%\Programs\Joonga Metadata` (current user), or a custom folder you choose, with optional Start Menu and Desktop shortcuts.
+3. Uninstall anytime from Windows **Settings → Apps → Installed apps** (or by running `"Joonga Metadata.exe" --uninstall`).
+
+**Portable ZIP:**
 1. Choose the **win-x64** ZIP for Intel/AMD PCs, or **win-arm64** for Windows on ARM.
 2. Extract the entire folder. Run **Joonga Metadata.exe** inside it.
 3. Keep `tools`, `exiftool_files`, runtime DLLs and the other supporting files with the executable. This is a portable folder, not a single-file executable.
@@ -92,4 +98,4 @@ The source has been cross-compiled on macOS for Windows. Portable engine checks 
 
 ## Source layout
 
-In [windows](../../windows), `MetadataTransfer.Core` contains platform-independent matching, metadata, ExifTool and workflow storage. `MetadataTransfer.Windows` contains the native UI and OS integration. `MetadataTransfer.Tests` contains a dependency-free regression runner and synthetic fixtures. Build output and personal libraries are excluded from the source ZIP and `.gitignore`.
+In [windows](../../windows), `MetadataTransfer.Core` contains platform-independent matching, metadata, ExifTool and workflow storage. `MetadataTransfer.Windows` contains the native UI, uninstaller and OS integration. `MetadataTransfer.Installer` builds the self-contained Windows 11 Setup executable. `MetadataTransfer.Tests` contains a dependency-free regression runner and synthetic fixtures. Build output and personal libraries are excluded from the source ZIP and `.gitignore`.
