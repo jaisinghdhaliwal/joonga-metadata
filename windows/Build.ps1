@@ -17,7 +17,12 @@ try {
         New-Item -ItemType Directory -Force $vendor | Out-Null
         $archive = Join-Path $vendor 'exiftool-13.64_64.zip'
         if (-not (Test-Path $archive)) {
-            Invoke-WebRequest 'https://sourceforge.net/projects/exiftool/files/exiftool-13.64_64.zip/download' -OutFile $archive
+            if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+                & curl.exe -fsSL 'https://sourceforge.net/projects/exiftool/files/exiftool-13.64_64.zip/download' -o $archive
+                if ($LASTEXITCODE -ne 0) { throw 'ExifTool download failed.' }
+            } else {
+                Invoke-WebRequest 'https://sourceforge.net/projects/exiftool/files/exiftool-13.64_64.zip/download' -UserAgent 'curl/8.0' -OutFile $archive
+            }
         }
         $expected = '72c29c44d1e860eebcaefa71692d979af9858fe9a6d7d791a5e7f1dac77804af'
         if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected) { throw 'ExifTool download checksum mismatch. Remove the cached ZIP and retry.' }
