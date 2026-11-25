@@ -36,7 +36,7 @@ public sealed partial class MainWindow : Window
         this.isolated=isolated;
         string? settingsError=null;try{settings=isolated?new Settings():Settings.Load();}catch(Exception e){settings=new();settingsError=e.Message;}
         Title=App.ProductName;Width=Math.Clamp(settings.Width,1040,2400);Height=Math.Clamp(settings.Height,620,1500);MinWidth=1040;MinHeight=620;ThemeMode=ThemeMode.System;WindowStartupLocation=WindowStartupLocation.CenterScreen;FontFamily=new FontFamily("Segoe UI Variable Text");FontSize=12;
-        Icon=new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/Assets/AppIcon.ico"));
+        Icon=System.Windows.Media.Imaging.BitmapFrame.Create(new Uri("pack://application:,,,/Assets/AppIcon.ico"));
         exif=ExifService.Find(settings.ExifTool) is string executable?new(executable):null;
         var root=new DockPanel();var top=new StackPanel();DockPanel.SetDock(top,Dock.Top);root.Children.Add(top);
         top.Children.Add(CreateHeader());
@@ -63,7 +63,7 @@ public sealed partial class MainWindow : Window
         Closing+=(_,e)=>
         {
             if(busy){MessageBox.Show(this,"An operation is still running. Use Cancel and wait for the current file to finish before closing.","Operation in progress");e.Cancel=true;return;}
-            if(PendingPaths.Length>0&&MessageBox.Show(this,"Close without saving pending metadata edits?","Unsaved edits",MessageBoxButton.YesNo,MessageBoxImage.Warning)!=MessageBoxResult.Yes){e.Cancel=true;return;}
+            if(PendingPaths.Length>0&&!ConfirmDiscardChanges()){e.Cancel=true;return;}
             inspection?.Cancel();settings.Width=RestoreBounds.Width;settings.Height=RestoreBounds.Height;SaveSettings();
         };
         SetMode(WorkspaceMode.Preview);UpdateControls();
@@ -75,6 +75,32 @@ public sealed partial class MainWindow : Window
             if(settings.DefaultExports is string folder&&Directory.Exists(folder))Receive(exports,[folder]);
         };
     }
+    private bool ConfirmDiscardChanges()
+    {
+        var dialog = UI.Window("Unsaved changes", 408, 224, this);
+        dialog.SizeToContent = SizeToContent.Height;
+        dialog.MinHeight = 0;
+        dialog.ResizeMode = ResizeMode.NoResize;
+        dialog.ShowInTaskbar = false;
+        dialog.ThemeMode = ThemeMode;
+        var content = new StackPanel { Margin = new Thickness(24, 20, 24, 18) };
+        content.Children.Add(UI.Text("Discard unsaved changes?", 20, true));
+        var detail = UI.Text("Your pending metadata edits will be lost when you close Joonga Metadata.", 13);
+        detail.Margin = new Thickness(0, 8, 0, 20);
+        content.Children.Add(detail);
+
+        var discard = UI.Button("Discard changes", () => dialog.DialogResult = true);
+        var keep = UI.Button("Keep editing", () => dialog.DialogResult = false);
+        keep.IsDefault = true;
+        keep.IsCancel = true;
+        var actions = UI.Horizontal(discard, keep);
+        actions.HorizontalAlignment = HorizontalAlignment.Right;
+        content.Children.Add(actions);
+        dialog.Content = content;
+        dialog.Loaded += (_, _) => keep.Focus();
+        return dialog.ShowDialog() == true;
+    }
+
     internal async Task LoadSmokeAsync(string source,string destination)
     {
         SetMode(WorkspaceMode.Transfer);originalInputs=[source];exportInputs=[destination];originalFiles=Matching.Expand(originalInputs).ToArray();exportFiles=Matching.Expand(exportInputs).ToArray();

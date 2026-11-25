@@ -33,7 +33,7 @@ public sealed partial class MainWindow
         AutoGenerateColumns=false, IsReadOnly=true, SelectionMode=DataGridSelectionMode.Extended,
         SelectionUnit=DataGridSelectionUnit.FullRow, RowHeight=42, GridLinesVisibility=DataGridGridLinesVisibility.None,
         HeadersVisibility=DataGridHeadersVisibility.Column, Background=Brushes.Transparent, BorderThickness=new Thickness(0),
-        AlternatingRowBackground=UI.Subtle, EnableRowVirtualization=true
+        RowBackground=Brushes.Transparent, Margin=new Thickness(10,5,10,6), EnableRowVirtualization=true
     };
     private readonly StackPanel mediaEmpty = new() { HorizontalAlignment=HorizontalAlignment.Center, VerticalAlignment=VerticalAlignment.Center };
     private Button addFiles = null!, saveAll = null!;
@@ -48,8 +48,9 @@ public sealed partial class MainWindow
         var horizontal = new FrameworkElementFactory(typeof(StackPanel));
         horizontal.SetValue(StackPanel.OrientationProperty,Orientation.Horizontal);
         modePicker.ItemsPanel=new ItemsPanelTemplate(horizontal);
-        var tab = new Style(typeof(ListBoxItem),(Style?)Application.Current.TryFindResource(typeof(ListBoxItem)));
-        tab.Setters.Add(new Setter(Control.PaddingProperty,new Thickness(12,4,12,4)));
+        var tab = new Style(typeof(ListBoxItem),(Style)FindResource("WorkspaceListItemStyle"));
+        tab.Setters.Add(new Setter(MarginProperty,new Thickness(1,0,1,0)));
+        tab.Setters.Add(new Setter(Control.PaddingProperty,new Thickness(9,3,9,3)));
         tab.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty,HorizontalAlignment.Center));
         tab.Setters.Add(new Setter(MinWidthProperty,62d));
         modePicker.ItemContainerStyle=tab;
@@ -60,7 +61,9 @@ public sealed partial class MainWindow
         mediaWorkspace.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(340),MinWidth=235});
         mediaWorkspace.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
         mediaList.ItemsSource=mediaItems;
-        var rowStyle=new Style(typeof(DataGridRow),(Style?)Application.Current.TryFindResource(typeof(DataGridRow)));
+        mediaList.AlternatingRowBackground = (Brush)FindResource("WorkspaceStripeBrush");
+        mediaList.CellStyle = (Style)FindResource("WorkspaceGridCellStyle");
+        var rowStyle = new Style(typeof(DataGridRow),(Style)FindResource("WorkspaceGridRowStyle"));
         rowStyle.Setters.Add(new Setter(FrameworkElement.ToolTipProperty,new Binding(nameof(WorkspaceMedia.Path))));
         mediaList.RowStyle=rowStyle;
         var thumbnail=new FrameworkElementFactory(typeof(Image));
@@ -123,7 +126,7 @@ public sealed partial class MainWindow
         mediaList.Columns.Add(new DataGridTextColumn
         {
             Header=header,Binding=new Binding(property),SortMemberPath=sortProperty??property,Width=width,MinWidth=minimum,
-            ElementStyle=new Style(typeof(TextBlock)){Setters={new Setter(TextBlock.TextTrimmingProperty,TextTrimming.CharacterEllipsis),new Setter(VerticalAlignmentProperty,VerticalAlignment.Center)}}
+            ElementStyle=new Style(typeof(TextBlock)){Setters={new Setter(TextBlock.TextTrimmingProperty,TextTrimming.CharacterEllipsis),new Setter(VerticalAlignmentProperty,VerticalAlignment.Center),new Setter(MarginProperty,new Thickness(4,0,8,0))}}
         });
     }
 

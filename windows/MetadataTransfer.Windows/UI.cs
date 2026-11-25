@@ -82,7 +82,7 @@ internal static class UI
     public static DrawingBrush Stripes()
     {
         var group=new DrawingGroup();group.Children.Add(new GeometryDrawing(Brushes.Transparent,null,new RectangleGeometry(new Rect(0,0,1,88))));
-        group.Children.Add(new GeometryDrawing(Subtle,null,new RectangleGeometry(new Rect(0,0,1,44))));
+        group.Children.Add(new GeometryDrawing((Brush)Application.Current.FindResource("WorkspaceStripeBrush"),null,new RectangleGeometry(new Rect(0,0,1,44))));
         return new DrawingBrush(group){TileMode=TileMode.Tile,Viewport=new Rect(0,0,1,88),ViewportUnits=BrushMappingMode.Absolute,Stretch=Stretch.Fill};
     }
 }

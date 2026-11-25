@@ -15,7 +15,7 @@
       <circle cx="687" cy="569" r="31" fill="black"/>
     </mask>
   </defs>
-  <g transform="translate(512 512) scale(1.5) translate(-512 -514)" mask="url(#tag-hole)">
+  <g transform="translate(512 512) scale(1.64) translate(-512 -514)" mask="url(#tag-hole)">
     <use href="#tag" x="222" y="319" fill="#F7F6F3" stroke="#BCB8B0" stroke-width="5"/>
     <use href="#tag" x="258" y="409" fill="#000000" opacity=".12" clip-path="url(#paper)"/>
     <use href="#tag" transform="translate(258 429)" fill="url(#coral)"/>
