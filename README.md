@@ -10,7 +10,7 @@ Manual edits, workflow assignments and map pins stay pending across files and mo
 
 ## Downloads
 
-[GitHub Releases](https://github.com/jaisinghdhaliwal/joonga-metadata/releases) contains beta builds for macOS (Apple silicon) and Windows (x64 and ARM64). See the platform guides below for requirements and setup.
+[GitHub Releases](https://github.com/jaisinghdhaliwal/joonga-metadata/releases) contains downloads for macOS (Apple silicon) and Windows (x64 and ARM64). See the platform guides below for requirements and setup.
 
 ## How it works
 
