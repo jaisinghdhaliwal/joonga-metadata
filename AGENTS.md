@@ -35,6 +35,32 @@ The intended experience is closer to Apple's Finder/Photos, MetaImage and
 MetaVideo than to a command-line front-end: compact, calm, thumbnail-led and
 system-native while still supporting detailed batch work.
 
+## Branding and visual provenance
+
+Joonga Metadata is part of the personal **Joonga** brand. Its visual language
+comes from Jai Singh Dhaliwal's portfolio site,
+[jaisinghdhaliwal.github.io](https://jaisinghdhaliwal.github.io), rather than
+from a generic developer-tool palette.
+
+- **Joonga coral** is the brand coral established on the portfolio site. Use it
+  as a restrained accent, not as a general text colour or a substitute for
+  hierarchy. The coral/system-accent rule in the design section is intentional.
+- The identity is **stacked metadata tags**, not a “J” monogram. Keep that
+  recognisable silhouette in macOS and Windows artwork.
+- The Windows icon must have no navy square background. Its red tag must be
+  visually opaque at the punched hole: do not allow the white/paper tag to show
+  through it.
+- The macOS icon is authored in Apple Icon Composer. Preserve the current
+  editable `macos/AppIcon *.icon` source and use its compiled artwork for macOS
+  builds; do not silently fall back to a different generic icon.
+- The product was renamed from Metadata Transfer to Joonga Metadata, but legacy
+  user-data locations intentionally retain the old name for compatibility.
+
+The design bar is “convincingly native”, not merely decorated: use Finder/Photos
+and Windows 11 Settings as references for density, typography, window chrome,
+focus/selection states, animation and visual restraint. Iterate visually after
+changes; do not stop at a technically functional layout.
+
 ## Product rules
 
 - Preserve media encoding. Metadata work uses ExifTool, not a transcoder.
@@ -109,9 +135,10 @@ inspired by Apple Photos.
 - Build with `bash macos/build.command`. It produces an ad-hoc-signed
   universal `arm64` + `x86_64` app at
   `macos/build/Joonga Metadata.app`.
-- Current editable Icon Composer source: `macos/AppIcon 5.icon`.
-  `AppIcon.icns` is only the static compatibility fallback. Do not restore the
-  superseded `AppIcon 4.icon`.
+- The current editable Icon Composer source is the newest `macos/AppIcon *.icon`
+  directory in the worktree. `AppIcon.icns` is only a static compatibility
+  fallback; do not delete, rename or revert an Icon Composer source without
+  checking the current worktree and its associated artwork.
 - ExifTool discovery defaults to `/opt/homebrew/bin/exiftool` and
   `/usr/local/bin/exiftool`.
 - Existing users retain legacy storage locations:
