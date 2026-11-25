@@ -1,0 +1,49 @@
+name: Windows build and tests
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: windows
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [win-x64, win-arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build, verify ExifTool, and run regression checks
+        shell: pwsh
+        run: ./Build.ps1 -Runtime ${{ matrix.runtime }}
+      - name: Smoke test native window and capture UI
+        if: matrix.runtime == 'win-x64'
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD 'build/win-x64/Joonga Metadata/Joonga Metadata.exe'
+          $process = Start-Process $exe -ArgumentList '--smoke-test' -PassThru
+          if (-not $process.WaitForExit(120000)) {
+            Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
+            throw 'UI smoke test timed out.'
+          }
+          if ($process.ExitCode -ne 0) { throw "UI smoke test failed: $($process.ExitCode)" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Joonga-Metadata-Windows-${{ matrix.runtime }}
+          path: windows/build/Joonga-Metadata-Windows-${{ matrix.runtime }}.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: matrix.runtime == 'win-x64' && always()
+        with:
+          name: Windows-UI-smoke-results
+          path: windows/build/win-x64/Joonga Metadata/SmokeResults/

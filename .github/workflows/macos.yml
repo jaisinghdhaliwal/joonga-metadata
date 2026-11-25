@@ -1,0 +1,28 @@
+name: macOS build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and verify the app bundle
+        run: |
+          ./macos/build.command
+          test -s "macos/build/Joonga Metadata.app/Contents/Resources/Assets.car"
+          codesign --verify --strict "macos/build/Joonga Metadata.app"
+      - name: Package the app
+        run: ditto -c -k --keepParent "macos/build/Joonga Metadata.app" macos/build/Joonga-Metadata-macOS.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Joonga-Metadata-macOS
+          path: macos/build/Joonga-Metadata-macOS.zip
+          if-no-files-found: error

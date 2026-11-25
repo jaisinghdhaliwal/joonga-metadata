@@ -1,0 +1,50 @@
+#!/bin/bash
+set -euo pipefail
+cd "$(dirname "$0")"
+
+icon_mode=${1:-}
+case "$#:$icon_mode" in
+    0:|1:--compat-icon|2:--icon-catalog) ;;
+    *) echo "Usage: $0 [--compat-icon | --icon-catalog /path/to/Assets.car]" >&2; exit 2 ;;
+esac
+
+app="$PWD/build/Joonga Metadata.app"
+resources="$app/Contents/Resources"
+deployment_target="$(/usr/bin/plutil -extract LSMinimumSystemVersion raw Info.plist)"
+mkdir -p build/cache "$app/Contents/MacOS" "$resources"
+
+swiftc -target "arm64-apple-macos$deployment_target" -module-cache-path build/cache \
+    Sources/*.swift -o "$app/Contents/MacOS/Joonga Metadata"
+cp Info.plist "$app/Contents/Info.plist"
+rm -f "$resources/Presets.json" "$resources/Assets.car" "$resources/AppIcon.icns"
+
+if [[ "$icon_mode" == --icon-catalog ]]; then
+    /usr/bin/assetutil --validate-file "$2"
+    cp "$2" "$resources/Assets.car"
+    /usr/bin/plutil -insert CFBundleIconName -string AppIcon "$app/Contents/Info.plist"
+elif [[ "$icon_mode" != --compat-icon ]]; then
+    # Use full Xcode for Icon Composer even if Command Line Tools are selected for Swift.
+    if [[ -z "${DEVELOPER_DIR:-}" ]] && ! xcrun --find actool >/dev/null 2>&1 &&
+        [[ -d /Applications/Xcode.app/Contents/Developer ]]; then
+        export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+    fi
+    if ! xcrun --find actool >/dev/null 2>&1; then
+        echo "Set DEVELOPER_DIR to Xcode 26 or newer, or pass --compat-icon for the static icon." >&2
+        exit 1
+    fi
+    catalog="$PWD/build/icon-catalog"
+    mkdir -p "$catalog"
+    rm -f "$catalog/Assets.car"
+    partial="$catalog/Icon-Info.plist"
+    xcrun actool --compile "$catalog" --output-partial-info-plist "$partial" \
+        --platform macosx --minimum-deployment-target "$deployment_target" --target-device mac \
+        --app-icon AppIcon --include-all-app-icons "$PWD/AppIcon.icon" </dev/null
+    test -s "$catalog/Assets.car"
+    cp "$catalog/Assets.car" "$resources/Assets.car"
+    icon_name="$(/usr/bin/plutil -extract CFBundleIconName raw "$partial" 2>/dev/null || printf AppIcon)"
+    /usr/bin/plutil -insert CFBundleIconName -string "$icon_name" "$app/Contents/Info.plist"
+fi
+
+# Keep the full-resolution compatibility icon alongside the layered catalog.
+cp AppIcon.icns "$resources/"
+codesign --force --sign - "$app"

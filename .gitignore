@@ -1,0 +1,15 @@
+.DS_Store
+build/
+bin/
+obj/
+.vs/
+*.xcuserstate
+*.user
+*.suo
+*.pfx
+Workflows.json
+My-Workflows.json
+Personal-Workflows.json
+Presets.json
+Settings.json
+SmokeResults/

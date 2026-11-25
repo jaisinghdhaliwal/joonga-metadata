@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="MetadataTransfer.Core/MetadataTransfer.Core.csproj" />
+  <Project Path="MetadataTransfer.Tests/MetadataTransfer.Tests.csproj" />
+  <Project Path="MetadataTransfer.Windows/MetadataTransfer.Windows.csproj" />
+</Solution>
