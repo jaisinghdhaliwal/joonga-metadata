@@ -249,12 +249,13 @@ inspired by Apple Photos.
   Copy/Paste Location into file context menus (and Edit menu shortcuts `⇧⌘C` /
   `⇧⌘V` across modes), and maps `⌘I` to toggle the collapsible
   inspector/preview across workspaces.
-- Verified on macOS: `bash macos/build.command` succeeded, `Assets.car` is
-  non-empty, bundled ExifTool reported `13.64`, `lipo -archs` confirmed
-  `x86_64` and `arm64`, and `codesign --verify --strict --all-architectures`
-  passed. Interactive GUI visual QA of the unified `Metadata`/`Map` shared file
-  pane, collapsible inspector, toolbar layout, and clustered map pin badges
-  remains open.
+- Verified on macOS (`0.9.1`, commit `81037b8`): `bash macos/build.command`
+  succeeded, `Assets.car` is non-empty, bundled ExifTool reported `13.64`,
+  `lipo -archs` confirmed `x86_64` and `arm64`, `codesign --verify --strict
+  --all-architectures` passed, and `Info.plist` reports `0.9.1`. Interactive
+  GUI visual QA of the unified `Metadata`/`Map` shared file pane, Finder-style
+  inspector, toolbar layout (without prev/next toolbar buttons), and clustered
+  map pin badges remains open.
 
 For metadata/workflow work, also test disposable JPEG and MP4 files, inspect
 ExifTool output and confirm backup behaviour. For map work, test search, click
@@ -275,26 +276,32 @@ no separate login, use the existing Git credential helper to supply
 Read access to the current release and repository push permission were
 verified with this setup on 2026-11-25.
 
-Current public version: **0.9.0**. The release page is:
-<https://github.com/jaisinghdhaliwal/joonga-metadata/releases/tag/v0.9.0>
+Current public version: **0.9.1** (`v0.9.1`, commit
+`81037b8d4c876f25986f959f00d469168e2bdf1e`). The release page is:
+<https://github.com/jaisinghdhaliwal/joonga-metadata/releases/tag/v0.9.1>
 
-Published installer assets for that release:
+Published assets for that release (all built from commit
+`81037b8d4c876f25986f959f00d469168e2bdf1e`):
 
-- `Joonga-Metadata-0.9.0-macOS.dmg`: universal drag-to-install DMG containing
-  `Joonga Metadata.app` plus an Applications shortcut.
-- `Joonga-Metadata-0.9.0-Windows-x64-Setup.exe`: per-user x64 setup.
-- `Joonga-Metadata-0.9.0-Windows-arm64-Setup.exe`: per-user ARM64 setup.
-- `SHA256SUMS-Installers.txt`: installer SHA-256 hashes.
+- `Joonga-Metadata-0.9.1-macOS.dmg`: universal (`arm64` + `x86_64`)
+  drag-to-install DMG containing `Joonga Metadata.app` plus an Applications
+  shortcut.
+- `Joonga-Metadata-0.9.1-macOS.zip`: universal (`arm64` + `x86_64`) portable
+  app bundle archive.
+- `Joonga-Metadata-0.9.1-Windows-x64.zip`: self-contained Windows 11 x64
+  portable build from CI run `45657484866` (core tests + `--smoke-test` UI
+  check passed on CI).
+- `Joonga-Metadata-0.9.1-Windows-arm64.zip`: self-contained Windows 11 ARM64
+  portable build from CI run `45657484866` (core tests passed on CI).
+- `SHA256SUMS.txt`: SHA-256 checksums for all release archives.
 
-The DMG was mounted and checked for its app and Applications shortcut. The
-Windows installers were checked by extracting their payloads against the
-portable builds; actual Windows installation/visual QA remains required.
-
-Important provenance: the existing `v0.9.0` tag predates the universal macOS
-build change. The DMG was built from newer source, while Windows setup payloads
-package the existing portable `v0.9.0` build. The next release must use a new
-version/tag from one exact commit and build all assets from that commit. Never
-silently retag an existing release.
+Validation status for `v0.9.1`: macOS `bash macos/build.command`, `Assets.car`,
+bundled ExifTool `13.64`, `lipo -archs` (`x86_64` + `arm64`), strict
+`codesign`, `CFBundleShortVersionString` `0.9.1`, DMG mount/contents check via
+`diskutil image attach`, and `shasum -a 256 -c SHA256SUMS.txt` all passed, along
+with macOS (`45657484917`) and Windows (`45657484866`) CI workflows. Interactive
+macOS GUI visual QA and manual Windows 11 QA (including Windows installer
+EXEs, which were not built on macOS) remain open.
 
 The repository CI produces portable ZIP artifacts. It does not yet contain a
 fully reproducible DMG/setup-installer release pipeline. macOS artifacts are
