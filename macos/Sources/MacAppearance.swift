@@ -52,6 +52,7 @@ struct MacAccentModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .environment(\.joongaAccent, accent)
+            .accentColor(accent.tint)
             .onReceive(NotificationCenter.default.publisher(for: NSColor.systemColorsDidChangeNotification)) { _ in
                 accent = MacAccent()
             }

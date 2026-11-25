@@ -202,6 +202,29 @@ inspired by Apple Photos.
 
 ### Current state (2026-11-25)
 
+- macOS uses compact list/map thumbnails and a separate larger inspector
+  preview cache, with decoded-byte and count limits. Duplicate Quick Look
+  thumbnail requests share the result and each cache limits concurrent work.
+
+- SwiftUI controls inherit Joonga's resolved accent. The map favourites arrow
+  opens an app-owned popover with accent-aware hover highlights. System menus
+  and dialogs still use macOS-controlled highlighting.
+
+- Transfer's Originals and Exports use the same AppKit row selection drawing
+  as Metadata, including during mouse tracking. Export match indicators
+  remain visible.
+
+- Adjacent selections in the macOS media table form a continuous accent
+  highlight with rounded outer edges. Separate selections form separate groups.
+
+- The macOS window uses one unified native toolbar above the workspace.
+  Content starts below the toolbar so the file table and inspector cannot
+  show through it or overlap it.
+
+- The macOS file-table header uses a persistent translucent tint with separate
+  light and dark values and redraws on attachment and layout. Its normal state stays
+  distinct from the file rows before hover.
+
 - The map star adds a favourite and its arrow opens the saved list, including removal.
   Cluster counts sit at the top right without a border. Map search uses an icon.
   Metadata opens with a compact inspector. The pending count opens a list of

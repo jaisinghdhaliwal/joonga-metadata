@@ -368,11 +368,46 @@ final class Library: ObservableObject {
  }
 }
 final class ThumbnailStore {
- static let shared=ThumbnailStore(); let cache=NSCache<NSURL,NSImage>()
- func load(_ url:URL,_ done:@escaping(NSImage)->Void) {
-  if let image=cache.object(forKey:url as NSURL){done(image);return}
-  let request=QLThumbnailGenerator.Request(fileAt:url,size:NSSize(width:640,height:440),scale:2,representationTypes:.all)
-  QLThumbnailGenerator.shared.generateBestRepresentation(for:request){ result,_ in DispatchQueue.main.async { let image=result?.nsImage ?? NSWorkspace.shared.icon(forFile:url.path); self.cache.setObject(image,forKey:url as NSURL); done(image) } }
+ static let shared = ThumbnailStore(size: NSSize(width: 72, height: 72), byteLimit: 24 * 1024 * 1024, count: 256)
+ static let preview = ThumbnailStore(size: NSSize(width: 480, height: 320), byteLimit: 12 * 1024 * 1024, count: 8)
+ let cache = NSCache<NSURL, NSImage>()
+ private let size: NSSize
+ private var waiting: [URL: [(NSImage) -> Void]] = [:]
+ private var queue: [URL] = []
+ private var active = 0
+
+ private init(size: NSSize, byteLimit: Int, count: Int) {
+  self.size = size
+  cache.totalCostLimit = byteLimit
+  cache.countLimit = count
+ }
+
+ func load(_ url: URL, _ done: @escaping (NSImage) -> Void) {
+  if let image = cache.object(forKey: url as NSURL) { done(image); return }
+  if waiting[url] != nil { waiting[url]?.append(done); return }
+  waiting[url] = [done]
+  queue.append(url)
+  startNext()
+ }
+
+ private func startNext() {
+  while active < 4, !queue.isEmpty {
+   let url = queue.removeFirst()
+   active += 1
+   let request = QLThumbnailGenerator.Request(fileAt: url, size: size, scale: 2, representationTypes: .all)
+   QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { result, _ in
+    DispatchQueue.main.async {
+     let image = result?.nsImage ?? NSWorkspace.shared.icon(forFile: url.path)
+     if let bitmap = result?.cgImage {
+      self.cache.setObject(image, forKey: url as NSURL, cost: bitmap.bytesPerRow * bitmap.height)
+     }
+     let callbacks = self.waiting.removeValue(forKey: url) ?? []
+     self.active -= 1
+     callbacks.forEach { $0(image) }
+     self.startNext()
+    }
+   }
+  }
  }
 }
 struct Thumbnail: View {
@@ -380,6 +415,7 @@ struct Thumbnail: View {
  var quickLookRow: QuickLookRow? = nil
  var contentMode: ContentMode = .fit
  var cornerRadius: CGFloat = 5
+ var largePreview = false
  @State private var image: NSImage?
  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -404,12 +440,13 @@ struct Thumbnail: View {
   .task(id:url) {
    image = nil
    guard let url else { return }
-   if let cached = ThumbnailStore.shared.cache.object(forKey:url as NSURL) {
+   let store = largePreview ? ThumbnailStore.preview : ThumbnailStore.shared
+   if let cached = store.cache.object(forKey:url as NSURL) {
     image = cached
     return
    }
    let loaded: NSImage = await withCheckedContinuation { continuation in
-    ThumbnailStore.shared.load(url) { continuation.resume(returning:$0) }
+    store.load(url) { continuation.resume(returning:$0) }
    }
    guard !Task.isCancelled else { return }
    withAnimation(reduceMotion ? nil : .easeOut(duration:0.14)) { image = loaded }
@@ -506,31 +543,7 @@ struct FilePane: View {
     }.padding(.vertical,18).padding(.horizontal,24)
 
    } else {
-    ScrollViewReader { scroll in
-    List(selection: Binding<Set<String>>(
-     get: { originals ? library.originalSelection : library.exportSelection },
-     set: { library.updateSelection($0, originals: originals) }
-    )) {
-     ForEach(Array(library.files.enumerated()), id: \.element.id) { index, pair in
-      let url = originals ? pair.original : pair.exported
-      FileListRow(
-       library: library, id: pair.id, originals: originals, url: url,
-       index: index, matched: pair.original != nil, status: pair.status
-      )
-     }
-     if originals {
-      ForEach(Array(library.unmatchedOriginals.enumerated()), id: \.element) { index, url in
-       FileListRow(
-        library: library, id: url.path, originals: true, url: url,
-        index: index + library.files.count, matched: false, status: nil
-       )
-      }
-     }
-    }.scrollContentBackground(.hidden).listStyle(.plain).environment(\.defaultMinListRowHeight,46).disabled(library.busy)
-     .onChange(of: library.selection) { selection in
-      if let selection, library.activeOriginals == originals { scroll.scrollTo(selection) }
-     }
-    }
+    TransferFileTable(library: library, originals: originals)
    }
    }
   }.overlay {
@@ -599,7 +612,7 @@ struct Inspector: View {
      LazyVStack(alignment:.leading,spacing:0) {
       VStack(alignment:.leading,spacing:14) {
        if !multiSelection {
-        Thumbnail(url: previewURL, cornerRadius: 8)
+        Thumbnail(url: previewURL, cornerRadius: 8, largePreview: true)
          .frame(maxWidth: .infinity)
          .frame(height: 210)
          .shadow(color: .black.opacity(0.28), radius: 8, y: 3)
@@ -818,7 +831,6 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
  #endif
  private let productName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Joonga Metadata"
  private weak var workflowMenu: NSMenu?
- private weak var favouritesMenu: NSMenu?
  private var workflowCommandCount = 0
  private var workspaceClosed = false
  private weak var workspaceControl: NSSegmentedControl?
@@ -864,7 +876,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
    }
    previewWindow.enableQuickLook()
   }
-  window.title=productName; window.titleVisibility = .hidden; window.titlebarAppearsTransparent=false; window.toolbarStyle = .unified; window.styleMask.insert(.fullSizeContentView); window.minSize=NSSize(width:920,height:540); window.contentView=NSHostingView(rootView: Workspace(library: library).modifier(MacAccentModifier())); let toolbar=NSToolbar(identifier:"WorkspaceToolbar"); toolbar.delegate=self; toolbar.displayMode = .iconOnly; toolbar.centeredItemIdentifiers = [.init("workspace")]; window.toolbar=toolbar; window.center(); window.setFrameAutosaveName("MetadataTransferWorkspace"); window.makeKeyAndOrderFront(nil);
+  window.title=productName; window.titleVisibility = .hidden; window.titlebarAppearsTransparent=false; window.toolbarStyle = .unified; window.minSize=NSSize(width:920,height:540); window.contentView=NSHostingView(rootView: Workspace(library: library).modifier(MacAccentModifier())); let toolbar=NSToolbar(identifier:"WorkspaceToolbar"); toolbar.delegate=self; toolbar.displayMode = .iconOnly; toolbar.centeredItemIdentifiers = [.init("workspace")]; window.toolbar=toolbar; window.toolbar?.showsBaselineSeparator = false; window.center(); window.setFrameAutosaveName("MetadataTransferWorkspace"); window.makeKeyAndOrderFront(nil);
   #if VISUAL_REVIEW
   if let sample=Bundle.main.resourceURL?.appendingPathComponent("Samples") {
    library.mode = .transfer; library.source=sample.appendingPathComponent("Originals"); library.destination=sample.appendingPathComponent("Exports"); library.scan()
@@ -882,18 +894,11 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
  func toolbarDefaultItemIdentifiers(_ toolbar:NSToolbar)->[NSToolbarItem.Identifier] { toolbarAllowedItemIdentifiers(toolbar) }
  func toolbar(_ toolbar:NSToolbar,itemForItemIdentifier id:NSToolbarItem.Identifier,willBeInsertedIntoToolbar:Bool)->NSToolbarItem? {
   if id.rawValue == "favourites" {
-   let item = NSMenuToolbarItem(itemIdentifier: id)
+   let item = NSToolbarItem(itemIdentifier: id)
    item.label = "Favourites"
-   item.toolTip = "Favourite Locations"
-   item.image = NSImage(systemSymbolName: "star", accessibilityDescription: "Favourites")
-   item.showsIndicator = true
-   item.target = self
-   item.action = #selector(saveFavouriteLocation)
-   let menu = NSMenu(title: "Favourites")
-   menu.delegate = self
-   menu.autoenablesItems = false
-   item.menu = menu
-   favouritesMenu = menu
+   item.view = NSHostingView(rootView: FavouriteToolbar(library: library, save: { [weak self] in
+    self?.saveFavouriteLocation()
+   }).modifier(MacAccentModifier()))
    updateWorkspaceTool(item, mode: library.mode)
    return item
   }
@@ -1064,48 +1069,6 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
  }
 
  func menuNeedsUpdate(_ menu: NSMenu) {
-  if menu === favouritesMenu {
-   menu.removeAllItems()
-   let saveItem = menu.addItem(withTitle: "Save Current Location…", action: #selector(saveFavouriteLocation), keyEquivalent: "")
-   saveItem.target = self
-   saveItem.isEnabled = !library.busy && (library.selectedMapLocation != nil || library.lastMapPoint != nil)
-   menu.addItem(.separator())
-   let favourites = library.favouriteLocations
-   if favourites.isEmpty {
-    let empty = NSMenuItem(title: "No Saved Favourites", action: nil, keyEquivalent: "")
-    empty.isEnabled = false
-    menu.addItem(empty)
-    return
-   }
-   for favourite in favourites {
-    let item = menu.addItem(withTitle: favourite.name, action: #selector(focusFavouriteLocation(_:)), keyEquivalent: "")
-    item.target = self
-    item.representedObject = favourite.id
-   }
-   menu.addItem(.separator())
-   let applyItem = menu.addItem(withTitle: "Apply to Selection", action: nil, keyEquivalent: "")
-   let applyMenu = NSMenu(title: "Apply to Selection")
-   applyMenu.autoenablesItems = false
-   let canApply = !library.busy && library.exif != nil && !library.mediaSelection.isEmpty
-   applyItem.isEnabled = canApply
-   for favourite in favourites {
-    let sub = applyMenu.addItem(withTitle: favourite.name, action: #selector(applyFavouriteLocation(_:)), keyEquivalent: "")
-    sub.target = self
-    sub.representedObject = favourite.id
-    sub.isEnabled = canApply
-   }
-   applyItem.submenu = applyMenu
-
-   let removeItem = menu.addItem(withTitle: "Remove Favourite", action: nil, keyEquivalent: "")
-   let removeMenu = NSMenu(title: "Remove Favourite")
-   for favourite in favourites {
-    let sub = removeMenu.addItem(withTitle: favourite.name, action: #selector(removeFavouriteLocation(_:)), keyEquivalent: "")
-    sub.target = self
-    sub.representedObject = favourite.id
-   }
-   removeItem.submenu = removeMenu
-   return
-  }
   guard menu === workflowMenu else { return }
   while menu.numberOfItems > workflowCommandCount {
    menu.removeItem(at: menu.numberOfItems - 1)
@@ -1143,21 +1106,6 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
    return
   }
   library.requestSaveFavourite = true
- }
- @objc private func focusFavouriteLocation(_ item: NSMenuItem) {
-  guard let id = item.representedObject as? UUID,
-        let favourite = library.favouriteLocations.first(where: { $0.id == id }) else { return }
-  library.focusMapPoint(favourite.point)
- }
- @objc private func applyFavouriteLocation(_ item: NSMenuItem) {
-  guard let id = item.representedObject as? UUID,
-        let favourite = library.favouriteLocations.first(where: { $0.id == id }) else { return }
-  library.stageLocation(favourite.point, targets: library.selectedTargets)
-  library.focusMapPoint(favourite.point)
- }
- @objc private func removeFavouriteLocation(_ item: NSMenuItem) {
-  guard let id = item.representedObject as? UUID else { return }
-  library.removeFavouriteLocation(id: id)
  }
 
  func validateMenuItem(_ item: NSMenuItem) -> Bool {

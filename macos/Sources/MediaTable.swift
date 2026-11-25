@@ -474,10 +474,20 @@ struct MediaTable: NSViewRepresentable {
     }
 }
 
-private final class AccentMediaRow: NSTableRowView {
+final class AccentMediaRow: NSTableRowView {
     var accent = MacAccent()
 
-    override var isSelected: Bool { didSet { refresh() } }
+    override var isSelected: Bool {
+        didSet {
+            refresh()
+            guard oldValue != isSelected, let table = superview as? NSTableView else { return }
+            let row = table.row(for: self)
+            guard row >= 0 else { return }
+            for neighbour in [row - 1, row + 1] where (0..<table.numberOfRows).contains(neighbour) {
+                table.rowView(atRow: neighbour, makeIfNecessary: false)?.needsDisplay = true
+            }
+        }
+    }
     override var isEmphasized: Bool { didSet { refresh() } }
     override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); refresh() }
     override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); refresh() }
@@ -494,11 +504,26 @@ private final class AccentMediaRow: NSTableRowView {
     override func drawSelection(in dirtyRect: NSRect) {
         guard isSelected else { return }
         accent.selectionBackground(active: usesEmphasis).setFill()
-        NSBezierPath(roundedRect: bounds.insetBy(dx: 8, dy: 2), xRadius: 6, yRadius: 6).fill()
+        var fill = bounds.insetBy(dx: 8, dy: 2)
+        if let table = superview as? NSTableView {
+            let row = table.row(for: self)
+            if row > 0 && table.selectedRowIndexes.contains(row - 1) {
+                if isFlipped { fill.origin.y -= 8 }
+                fill.size.height += 8
+            }
+            if row >= 0 && table.selectedRowIndexes.contains(row + 1) {
+                if !isFlipped { fill.origin.y -= 8 }
+                fill.size.height += 8
+            }
+        }
+        NSGraphicsContext.saveGraphicsState()
+        NSBezierPath(rect: bounds).addClip()
+        NSBezierPath(roundedRect: fill, xRadius: 6, yRadius: 6).fill()
+        NSGraphicsContext.restoreGraphicsState()
     }
 }
 
-private final class TranslucentMediaTable: NSTableView {
+final class TranslucentMediaTable: NSTableView {
     override func drawBackground(inClipRect clipRect: NSRect) {
         let pitch = rowHeight + intercellSpacing.height
         guard pitch > 0 else { return }
@@ -518,14 +543,37 @@ private final class TranslucentMediaHeaderView: NSTableHeaderView {
     override var isOpaque: Bool { false }
     override init(frame frameRect: NSRect) {
         super.init(frame: NSRect(x: 0, y: 0, width: frameRect.width, height: 30))
+        wantsLayer = true
+        updateTint()
+    }
+
+    private func updateTint() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            layer?.backgroundColor = NSColor(white: dark ? 0.18 : 0.91, alpha: 0.86).cgColor
+        }
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateTint()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateTint()
+        needsDisplay = true
+    }
+
+    override func layout() {
+        super.layout()
+        needsDisplay = true
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.black.withAlphaComponent(0.07).setFill()
-        bounds.fill()
         if let table = tableView {
             for (index,column) in table.tableColumns.enumerated() {
                 let rect = headerRect(ofColumn: index)

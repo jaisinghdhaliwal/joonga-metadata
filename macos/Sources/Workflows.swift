@@ -302,6 +302,8 @@ struct WorkflowView: View {
                             }.padding(.vertical, 6).tag(preset.id)
                         }
                     }.listStyle(.sidebar)
+                    .accentColor(accent.tint)
+                    .tint(accent.tint)
                     .overlay { if filteredPresets.isEmpty { Text(search.isEmpty ? "Your workflows appear here" : "No matching workflows").font(.caption).foregroundStyle(.secondary).allowsHitTesting(false) } }
                     .onDeleteCommand { if !selectedIDs.isEmpty { confirmingDelete = true } }
                     Divider()

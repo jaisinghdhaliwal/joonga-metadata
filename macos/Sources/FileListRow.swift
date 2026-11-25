@@ -6,7 +6,6 @@ struct FileListRow: View {
     let id: String
     let originals: Bool
     let url: URL?
-    let index: Int
     let matched: Bool
     let status: String?
 
@@ -14,8 +13,13 @@ struct FileListRow: View {
     @Environment(\.controlActiveState) private var controlActiveState
 
     private var isSelected: Bool {
-        (originals ? library.originalSelection : library.exportSelection).contains(id)
+        selection.contains(id)
     }
+
+    private var selection: Set<String> {
+        originals ? library.originalSelection : library.exportSelection
+    }
+
 
     private var isEmphasized: Bool {
         controlActiveState == .key && library.activeOriginals == originals
@@ -56,26 +60,7 @@ struct FileListRow: View {
         .id(id)
         .tag(id)
         .contextMenu { FileContextMenu(library: library, id: id, originals: originals, url: url) }
-        .listRowInsets(EdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 14))
-        .listRowSeparator(.hidden)
-        .listRowBackground(rowBackground)
+        .padding(.horizontal, 14)
     }
 
-    private var rowBackground: some View {
-        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
-        return ZStack(alignment: .leading) {
-            Color.clear
-            if isSelected {
-                shape.fill(accent.selectionFill(active: isEmphasized))
-            } else {
-                shape.fill(index.isMultiple(of: 2) ? Color.black.opacity(0.07) : .clear)
-                if matched {
-                    shape.fill(Color.green.opacity(0.045))
-                    Capsule().fill(Color.green.opacity(0.72)).frame(width: 2).padding(.vertical, 9)
-                }
-            }
-        }
-        .padding(.horizontal, 8)
-        .background(Color.clear)
-    }
 }
