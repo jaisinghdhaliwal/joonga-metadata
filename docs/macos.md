@@ -1,10 +1,10 @@
 # Joonga Metadata for macOS
 
-A native macOS application for comparing, editing and copying media metadata. Built with SwiftUI, AppKit, Quick Look and MapKit. Requires Apple silicon, macOS 13 or later, and ExifTool installed at `/opt/homebrew/bin/exiftool` or `/usr/local/bin/exiftool`.
+A native macOS application for comparing, editing and copying media metadata. Built with SwiftUI, AppKit, Quick Look and MapKit. The universal build runs on Apple silicon and Intel Macs with macOS 13 or later. Install ExifTool for metadata operations. The app looks for it at `/opt/homebrew/bin/exiftool` and `/usr/local/bin/exiftool`.
 
 ## Build
 
-Install Xcode 26 or newer and run `./macos/build.command` from the repository root to compile the layered Icon Composer icon. If you already compiled this icon into an asset catalog, run `./macos/build.command --icon-catalog /path/to/Assets.car` to reuse it. With Command Line Tools only, run `./macos/build.command --compat-icon` to use the static compatibility icon. The app appears at `macos/build/Joonga Metadata.app`. The build uses an explicit deployment target and a local compiler cache.
+Install Xcode 26 or newer and run `bash macos/build.command` from the repository root to compile the layered Icon Composer icon. If you already compiled this icon into an asset catalog, run `bash macos/build.command --icon-catalog /path/to/Assets.car` to reuse it. With Command Line Tools only, run `bash macos/build.command --compat-icon` to use the static compatibility icon. Both architectures are built and combined into `macos/build/Joonga Metadata.app`.
 
 ## Workflow library
 

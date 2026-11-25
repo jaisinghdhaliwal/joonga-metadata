@@ -16,9 +16,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build and verify the app bundle
         run: |
-          ./macos/build.command
+          bash macos/build.command
           test -s "macos/build/Joonga Metadata.app/Contents/Resources/Assets.car"
-          codesign --verify --strict "macos/build/Joonga Metadata.app"
+          xcrun lipo "macos/build/Joonga Metadata.app/Contents/MacOS/Joonga Metadata" -verify_arch arm64 x86_64
+          codesign --verify --strict --all-architectures "macos/build/Joonga Metadata.app"
       - name: Package the app
         run: ditto -c -k --keepParent "macos/build/Joonga Metadata.app" macos/build/Joonga-Metadata-macOS.zip
       - uses: actions/upload-artifact@v4

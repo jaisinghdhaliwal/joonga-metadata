@@ -9,12 +9,17 @@ case "$#:$icon_mode" in
 esac
 
 app="$PWD/build/Joonga Metadata.app"
+executable="$app/Contents/MacOS/Joonga Metadata"
 resources="$app/Contents/Resources"
 deployment_target="$(/usr/bin/plutil -extract LSMinimumSystemVersion raw Info.plist)"
 mkdir -p build/cache "$app/Contents/MacOS" "$resources"
 
-swiftc -target "arm64-apple-macos$deployment_target" -module-cache-path build/cache \
-    Sources/*.swift -o "$app/Contents/MacOS/Joonga Metadata"
+for architecture in arm64 x86_64; do
+    swiftc -target "${architecture}-apple-macos${deployment_target}" -module-cache-path "build/cache/$architecture" \
+        Sources/*.swift -o "build/Joonga Metadata.$architecture"
+done
+xcrun lipo -create "build/Joonga Metadata.arm64" "build/Joonga Metadata.x86_64" -output "$executable"
+
 cp Info.plist "$app/Contents/Info.plist"
 rm -f "$resources/Presets.json" "$resources/Assets.car" "$resources/AppIcon.icns"
 
