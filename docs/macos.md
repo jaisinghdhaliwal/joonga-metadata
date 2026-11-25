@@ -1,10 +1,12 @@
 # Joonga Metadata for macOS
 
-A native macOS application for comparing, editing and copying media metadata. Built with SwiftUI, AppKit, Quick Look and MapKit. The universal build runs on Apple silicon and Intel Macs with macOS 13 or later. Install ExifTool for metadata operations. The app looks for it at `/opt/homebrew/bin/exiftool` and `/usr/local/bin/exiftool`.
+A native macOS application for comparing, editing and copying media metadata. Built with SwiftUI, AppKit, Quick Look and MapKit. The universal build runs on Apple silicon and Intel Macs with macOS 13 or later.
+
+ExifTool 13.64 is bundled inside the app (`Contents/Resources/exiftool/`), so metadata operations work without a separate installation. If you install a newer ExifTool separately (for example via Homebrew at `/opt/homebrew/bin/exiftool`), you can point Joonga Metadata to it in **Settings** and restore the app-bundled ExifTool at any time.
 
 ## Build
 
-Install Xcode 26 or newer and run `bash macos/build.command` from the repository root to compile the layered Icon Composer icon. If you already compiled this icon into an asset catalog, run `bash macos/build.command --icon-catalog /path/to/Assets.car` to reuse it. With Command Line Tools only, run `bash macos/build.command --compat-icon` to use the static compatibility icon. Both architectures are built and combined into `macos/build/Joonga Metadata.app`.
+Install Xcode 26 or newer and run `bash macos/build.command` from the repository root to compile the layered Icon Composer icon, download and verify the pinned ExifTool distribution (`13.64`), and assemble the app bundle. Set `EXIFTOOL_DIR` to an already-extracted ExifTool directory to build without downloading. If you already compiled this icon into an asset catalog, run `bash macos/build.command --icon-catalog /path/to/Assets.car` to reuse it. With Command Line Tools only, run `bash macos/build.command --compat-icon` to use the static compatibility icon. Both architectures are built and combined into `macos/build/Joonga Metadata.app`.
 
 ## Workflow library
 
@@ -32,7 +34,7 @@ Add files or folders in Preview, Metadata or Map. Select files in Map and click 
 
 Set **System Settings → Appearance → Accent colour** to **Multicolour** to use Joonga coral for in-app controls and active file selection. Any explicit system accent, including Blue or Graphite, takes precedence. File selection uses a quieter highlight when the workspace is inactive.
 
-Open **Joonga Metadata → Settings** with Command-comma. Set the default exports folder for future launches, choose whether to show the preview on startup, check the detected ExifTool path, or open the workflow library folder. Use **File** for choosing and opening folders, copying metadata, and saving edits. **View** contains preview, navigation, and refresh commands. **Workflows** opens the editor and library.
+Open **Joonga Metadata → Settings** with Command-comma. Set the default exports folder for future launches, choose whether to show the preview on startup, change the ExifTool path or restore the app-bundled ExifTool, or open the workflow library folder. Use **File** for choosing and opening folders, copying metadata, and saving edits. **View** contains preview, navigation, and refresh commands. **Workflows** opens the editor and library.
 
 ## Shortcuts
 

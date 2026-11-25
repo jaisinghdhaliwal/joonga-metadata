@@ -88,9 +88,8 @@ All modes share loaded files and selection where the platform permits.
 
 | Mode | Purpose |
 | --- | --- |
-| Preview | Browse, sort and inspect files and metadata. |
-| Metadata | Edit categorized metadata for one or many selected files. |
-| Map | Plot saved/pending GPS data, search/click a place, stage coordinates, copy/paste locations and manage favourites. |
+| Metadata | Browse, sort, and edit categorized metadata using the shared file pane and a collapsible right inspector sidebar (Preview merged into Metadata on macOS). |
+| Map | Plot saved/pending GPS data with grouped cluster counts, search/click a place, stage coordinates, copy/paste locations and manage favourites using the shared file pane. |
 | Transfer | Match originals to exports and copy writable metadata to matching export files. |
 
 Matching is case-insensitive by filename stem across extensions. A trailing
@@ -99,6 +98,16 @@ matches. Folder scans are recursive; individual files and folders can be
 dropped into either pane.
 
 ### Design direction
+
+File table headers (`30pt` tall, vertically centered text) and alternating
+stripes (`46pt` row height, `8pt` horizontal inset, `6pt` corner radius) use a
+translucent dark tint over the macOS backdrop. Keep the same stripe pattern
+across all modes, including borderless empty-state drop areas. Map controls use
+separate native Liquid Glass pills/buttons (`GlassEffectContainer`,
+`.glassEffect`, and an accent-tinted `36pt` Search pill) on macOS 26 and system
+material on earlier versions, with Favourites in the window toolbar and
+Copy/Paste Location in file context menus and the Edit menu. Open Settings from
+the app menu or Command-comma, and open or toggle the inspector with Command-I.
 
 **macOS:** use SwiftUI/AppKit system conventions. The reference is modern
 Finder/Photos: restrained translucency, compact pane headers, subtle selection,
@@ -136,11 +145,17 @@ inspired by Apple Photos.
   universal `arm64` + `x86_64` app at
   `macos/build/Joonga Metadata.app`.
 - The current editable Icon Composer source is the newest `macos/AppIcon *.icon`
-  directory in the worktree. `AppIcon.icns` is only a static compatibility
-  fallback; do not delete, rename or revert an Icon Composer source without
-  checking the current worktree and its associated artwork.
-- ExifTool discovery defaults to `/opt/homebrew/bin/exiftool` and
-  `/usr/local/bin/exiftool`.
+  directory in the worktree (`macos/build.command` selects the newest
+  `AppIcon*.icon` containing `icon.json`). `AppIcon.icns` is only a static
+  compatibility fallback; do not delete, rename or revert an Icon Composer
+  source without checking the current worktree and its associated artwork.
+- ExifTool 13.64 (`Image-ExifTool-13.64.tar.gz`, SHA-256 verified) is bundled
+  into `Contents/Resources/exiftool/` during `macos/build.command` (overridable
+  via `EXIFTOOL_DIR`). The app defaults to the bundled ExifTool (falling back
+  to `/opt/homebrew/bin/exiftool`, `/usr/local/bin/exiftool`, `/usr/bin/exiftool`
+  only if unbundled). Settings allows configuring a custom ExifTool path
+  (stored in Preferences as `CustomExifToolPath`, validated with `-ver`) and
+  restoring the app-bundled ExifTool with one button.
 - Existing users retain legacy storage locations:
   `~/Library/Application Support/Metadata Transfer/Workflows.json`; settings
   use the app's Preferences storage.
@@ -181,9 +196,65 @@ inspired by Apple Photos.
 
 | Platform | Build | Minimum verification |
 | --- | --- | --- |
-| macOS | `bash macos/build.command` | Verify `Assets.car`, both slices with `lipo`, and strict code-sign verification. |
+| macOS | `bash macos/build.command` | Verify `Assets.car`, bundled `Contents/Resources/exiftool/exiftool`, both slices with `lipo`, and strict code-sign verification. |
 | Windows x64 | `.\\windows\\Build.ps1 -Runtime win-x64` | Build verifies ExifTool, publishes self-contained app and runs core tests. |
 | Windows ARM64 | `.\\windows\\Build.ps1 -Runtime win-arm64` | Same core checks; confirm native visual/runtime behaviour on ARM hardware. |
+
+### Current state (2026-11-25)
+
+- `macos/build.command` bundles pinned ExifTool 13.64 into
+  `Contents/Resources/exiftool/` and compiles the newest valid
+  `AppIcon*.icon` directory (`macos/AppIcon 7.icon` in the latest build).
+- macOS Settings (**Tools and data → ExifTool**) supports entering or choosing
+  a custom ExifTool executable path, validating it with `-ver`, and restoring
+  the app-bundled ExifTool via **Use Bundled ExifTool**. Settings is opened via
+  the app menu or `⌘,` (no window toolbar button).
+- macOS UI merges `Preview` and `Metadata` into a unified `Metadata` workspace
+  with a collapsible right inspector (Finder-style `210pt` preview thumbnail,
+  title/kind-size header, inline section jumper, flat virtualized `LazyVStack`
+  rows, and toolbar/`⌘I` collapse toggle), sharing a single persistent
+  `MediaTable` file pane
+  and a `ZStack`-retained `MKMapView` (`WorkspaceMap`) across `Metadata` and
+  `Map` inside one `HSplitView` alongside `Transfer`. Translucent `30pt` table
+  headers with vertically centered text, MetaImage-style `Filename` rows
+  (`42×34` filled thumbnails, abbreviated folder path, `46pt` row height),
+  alternating checkerboard stripes (`8pt` inset, `6pt` radius), and borderless
+  empty drop prompts sit over stable `.underWindowBackground` vibrancy extending
+  into the transparent unified titlebar.
+- macOS media tables (`Metadata`, `Map`) load folders immediately as
+  placeholder rows with a `2.5pt` accent loading progress bar along the top
+  header edge and stream ExifTool metadata in batches of 60 via `readBatch`
+  (`runJSON` isolates `stdout` from `stderr` with single-pass GPS extraction
+  and precomputed `MediaItem` fields). `MediaTable` uses version-gated sorting/
+  reloading (`mediaItemsVersion`/`pendingVersion`) and in-place column
+  preservation across mode switches; media tables and map pins use pure AppKit
+  reusable views (`MediaTableCell`/`MediaThumbnailView`,
+  `PhotoMapAnnotationView`, and `PhotoClusterAnnotationView` for grouped map
+  thumbnails with a corner count badge) alongside async multi-file inspection
+  to keep workspace switching smooth, support per-mode customizable and
+  reorderable columns (including Road/Location, City, State/Region, Country,
+  Altitude, Camera/Exposure fields, or Filename-only) persisted in Preferences,
+  and support Clear All Files (`trash` toolbar button + File menu) and
+  right-click / File-menu removal of selected files.
+- macOS window chrome hides the visible titlebar title (`titleVisibility =
+  .hidden`), aligns file-pane toolbar controls on the left next to the traffic
+  lights (`originals`, `clear`, `exports`, `refresh`), keeps Previous/Next File
+  navigation in the View menu (`⌥⌘[` / `⌥⌘]`), centers the workspace switcher
+  (`workspace`), and groups right-pane toolbar controls on the right
+  (`workflows`, `favourites`, `inspector`).
+- macOS Map workspace separates a `36pt` search field pill, an accent-tinted
+  `36pt` Liquid Glass Search button, and a `36pt` Map Options pill inside
+  `GlassEffectContainer` (macOS 26+ with `.regularMaterial` fallback), moves
+  Favourites into an `NSMenuToolbarItem` in the right toolbar group, moves
+  Copy/Paste Location into file context menus (and Edit menu shortcuts `⇧⌘C` /
+  `⇧⌘V` across modes), and maps `⌘I` to toggle the collapsible
+  inspector/preview across workspaces.
+- Verified on macOS: `bash macos/build.command` succeeded, `Assets.car` is
+  non-empty, bundled ExifTool reported `13.64`, `lipo -archs` confirmed
+  `x86_64` and `arm64`, and `codesign --verify --strict --all-architectures`
+  passed. Interactive GUI visual QA of the unified `Metadata`/`Map` shared file
+  pane, collapsible inspector, toolbar layout, and clustered map pin badges
+  remains open.
 
 For metadata/workflow work, also test disposable JPEG and MP4 files, inspect
 ExifTool output and confirm backup behaviour. For map work, test search, click
@@ -197,6 +268,12 @@ mouse behaviour. Do not claim this has been visually verified solely because a
 cross-build succeeds.
 
 ## Distribution
+
+Use GitHub CLI for release maintenance from the terminal. If GitHub CLI has
+no separate login, use the existing Git credential helper to supply
+`GH_TOKEN` for the command process. Keep credentials out of logs and files.
+Read access to the current release and repository push permission were
+verified with this setup on 2026-11-25.
 
 Current public version: **0.9.0**. The release page is:
 <https://github.com/jaisinghdhaliwal/joonga-metadata/releases/tag/v0.9.0>

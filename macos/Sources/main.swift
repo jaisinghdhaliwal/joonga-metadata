@@ -5,16 +5,26 @@ import QuickLookThumbnailing
 struct Match: Identifiable { let id: String; let original: URL?; let exported: URL; let status: String }
 struct MetadataRow: Identifiable { let id: String; let name: String; let group: String; let original: String; let exported: String; var mixed = false; var changed: Bool { mixed || original != exported } }
 final class Library: ObservableObject {
- @Published var mode: WorkspaceMode = .preview {
-  didSet { if oldValue != mode { editing = mode == .metadata; message = ""; inspect(); onModeChanged?(mode) } }
+ @Published var mode: WorkspaceMode = .metadata {
+  didSet {
+   guard oldValue != mode else { return }
+   let shouldEdit = mode == .metadata
+   if editing != shouldEdit { editing = shouldEdit }
+   if !message.isEmpty { message = "" }
+   inspect()
+   onModeChanged?(mode)
+  }
  }
  var onModeChanged: ((WorkspaceMode) -> Void)?
- @Published var mediaItems = [MediaItem]()
+ var mediaItemsVersion = 0
+ var pendingVersion = 0
+ @Published var mediaItems = [MediaItem]() { didSet { mediaItemsVersion += 1 } }
  @Published var mediaSelection = Set<String>() { didSet { if mode != .transfer && oldValue != mediaSelection { inspect() } } }
  @Published var mediaLoading = false
+ @Published var loadingProgress: Double? = nil
  var displayedMediaOrder: [String] = []
- @Published var locationDrafts = [String: MapCoordinate]()
- @Published var workflowDrafts = [String: [String]]()
+ @Published var locationDrafts = [String: MapCoordinate]() { didSet { pendingVersion += 1 } }
+ @Published var workflowDrafts = [String: [String]]() { didSet { pendingVersion += 1 } }
  func hasPending(_ path: String) -> Bool {
   drafts[path]?.isEmpty == false || locationDrafts[path] != nil || workflowDrafts[path] != nil
  }
@@ -24,18 +34,24 @@ final class Library: ObservableObject {
  @Published var presets = [Preset]()
  @Published var showWorkflows = false
  @Published var showSettings = false
- @Published var drafts = [String: [String: String]]()
+ @Published var drafts = [String: [String: String]]() { didSet { pendingVersion += 1 } }
  @Published var editOriginal = false
- @Published var editing = false
+ @Published var editing = true
  @Published var newTag = ""
  @Published var newValue = ""
  @Published var defaultExports: URL?
  let workflowFile: URL
  @Published var requestNewWorkflow = false
  @Published var saveWorkflowRequest = UUID()
+ @Published var lastMapPoint: MapCoordinate?
+ @Published var mapFocusRequest: LocationPin?
+ @Published var requestSaveFavourite = false
+ @Published var favouriteLocationsVersion = UUID()
+ var mediaLoadVersion = 0
  init(workflowFile: URL? = nil) {
   self.workflowFile = workflowFile ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Metadata Transfer/Workflows.json")
   loadPresets()
+  configureExifTool()
   if let data=UserDefaults.standard.data(forKey:"DefaultExportsBookmark") { var stale=false; defaultExports=try? URL(resolvingBookmarkData:data,options:[],relativeTo:nil,bookmarkDataIsStale:&stale); destination=defaultExports }
  }
  func saveDefaultExports() {
@@ -123,13 +139,30 @@ final class Library: ObservableObject {
  @Published var metadata: [MetadataRow] = []
  @Published var locationPins = [LocationPin]()
  private var inspectionVersion = 0
- @Published var showInspector = UserDefaults.standard.object(forKey: "ShowPreviewOnLaunch") as? Bool ?? true
+ @Published var showInspector = UserDefaults.standard.object(forKey: "ShowPreviewOnLaunch") as? Bool ?? true {
+  didSet { if showInspector && !oldValue && mode == .metadata { inspect() } }
+ }
  @Published var changesOnly = true
  @Published var busy = false
  @Published var reading = false
  @Published var message = ""
  @Published var report: String?
- let exif = ["/opt/homebrew/bin/exiftool","/usr/local/bin/exiftool","/usr/bin/exiftool"].first { FileManager.default.isExecutableFile(atPath:$0) }
+ @Published var exif: String?
+ @Published var customExifToolPath: String?
+ @Published var exifToolVersion: String?
+ @Published var exifToolError: String?
+ private let exifLock = NSLock()
+ private var activeExifPath: String?
+ func setActiveExifPath(_ path: String?) {
+  exifLock.lock()
+  activeExifPath = path
+  exifLock.unlock()
+ }
+ func currentExifPath() -> String? {
+  exifLock.lock()
+  defer { exifLock.unlock() }
+  return activeExifPath
+ }
  let image = Set("3fr arq arw avif bmp cr2 cr3 crw dcr dng erf fff gif gpr heic heif hif iiq insp j2k jp2 jpeg jpg jxl mef mos mrw nef nrw orf pef png psb psd raf raw rw2 rwl sr2 srf srw tif tiff webp x3f".split(separator:" ").map(String.init))
  let video = Set("3g2 3gp 3gp2 3gpp avi crm dv f4v m2ts m4v mkv mov mp4 mpeg mpg mts mxf qt webm wmv".split(separator:" ").map(String.init))
  var selected: Match? {
@@ -195,21 +228,88 @@ final class Library: ObservableObject {
   }
  }
  func run(_ arguments:[String])->(Int32,String) {
-  guard let exif=exif else{return (1,"ExifTool is not installed.")}; let process=Process(); process.executableURL=URL(fileURLWithPath:exif); process.arguments=arguments; let pipe=Pipe(); process.standardOutput=pipe; process.standardError=pipe
+  guard let exif=currentExifPath() else{return (1,"ExifTool is not available. Check Settings to restore or choose ExifTool.")}; let process=Process(); process.executableURL=URL(fileURLWithPath:exif); process.arguments=arguments; let pipe=Pipe(); process.standardInput=FileHandle.nullDevice; process.standardOutput=pipe; process.standardError=pipe
   do { try process.run(); let data=pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit(); return (process.terminationStatus,String(data:data,encoding:.utf8) ?? "") } catch{return (1,error.localizedDescription)}
  }
- func read(_ url:URL)->[String:Any] { let (_,text)=run(["-j","-G1","-s",url.path]); guard let data=text.data(using:.utf8), let rows=(try? JSONSerialization.jsonObject(with:data)) as? [[String:Any]] else{return [:]}; return rows.first ?? [:] }
+ func runJSON(_ arguments:[String]) -> Data? {
+  guard let exif = currentExifPath() else { return nil }
+  let process = Process()
+  process.executableURL = URL(fileURLWithPath: exif)
+  process.arguments = arguments
+  let stdout = Pipe()
+  process.standardInput = FileHandle.nullDevice
+  process.standardOutput = stdout
+  process.standardError = FileHandle.nullDevice
+  do {
+   try process.run()
+   let data = stdout.fileHandleForReading.readDataToEndOfFile()
+   process.waitUntilExit()
+   return data.isEmpty ? nil : data
+  } catch {
+   return nil
+  }
+ }
+ func read(_ url:URL)->[String:Any] {
+  guard let data = runJSON(["-j","-G1","-s","-q","-q","-c","%+.7f",url.path]),
+        let rows = (try? JSONSerialization.jsonObject(with: data)) as? [[String:Any]] else { return [:] }
+  return rows.first ?? [:]
+ }
+ func readBatch(_ urls:[URL])->[String:[String:Any]] {
+  guard !urls.isEmpty else { return [:] }
+  if let data = runJSON(["-j","-G1","-s","-q","-q","-c","%+.7f"] + urls.map(\.path)),
+     let rows = (try? JSONSerialization.jsonObject(with: data)) as? [[String:Any]] {
+   var result = [String:[String:Any]]()
+   result.reserveCapacity(rows.count * 2)
+   for row in rows {
+    if let source = row["SourceFile"] as? String {
+     result[source] = row
+     let normalized = URL(fileURLWithPath: source).standardizedFileURL.resolvingSymlinksInPath().path
+     result[normalized] = row
+    }
+   }
+   return result
+  }
+  guard urls.count > 1 else { return [:] }
+  var fallback = [String:[String:Any]]()
+  for url in urls {
+   let tags = read(url)
+   if !tags.isEmpty {
+    fallback[url.path] = tags
+    fallback[url.standardizedFileURL.resolvingSymlinksInPath().path] = tags
+   }
+  }
+  return fallback
+ }
  func inspect() {
   inspectionVersion += 1
   let version = inspectionVersion
-  metadata=[]; locationPins=[]
   if mode != .transfer {
    let items = mediaItems.filter { mediaSelection.contains($0.id) }
-   metadata = aggregateMetadata(items.map(\.tags))
-   locationPins = items.compactMap(\.pin)
-   reading = false
+   let pins = items.compactMap(\.pin)
+   locationPins = pins
+   guard mode == .metadata && showInspector else {
+    if !metadata.isEmpty { metadata = [] }
+    if reading { reading = false }
+    return
+   }
+   let tagDocs = items.map(\.tags)
+   if tagDocs.count <= 1 {
+    metadata = aggregateMetadata(tagDocs)
+    reading = false
+   } else {
+    reading = true
+    DispatchQueue.global(qos: .userInitiated).async {
+     let rows = aggregateMetadata(tagDocs)
+     DispatchQueue.main.async {
+      guard self.inspectionVersion == version else { return }
+      self.metadata = rows
+      self.reading = false
+     }
+    }
+   }
    return
   }
+  metadata=[]; locationPins=[]
   guard let pair=selected else { reading=false; return }
   let urls=selectedTargets
   let selectedIDs = activeOriginals ? originalSelection : exportSelection
@@ -279,6 +379,7 @@ struct Thumbnail: View {
  let url: URL?
  var quickLookRow: QuickLookRow? = nil
  var contentMode: ContentMode = .fit
+ var cornerRadius: CGFloat = 5
  @State private var image: NSImage?
  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -299,7 +400,7 @@ struct Thumbnail: View {
      .foregroundStyle(.tertiary)
    }
   }
-  .clipShape(RoundedRectangle(cornerRadius:5,style:.continuous))
+  .clipShape(RoundedRectangle(cornerRadius:cornerRadius,style:.continuous))
   .task(id:url) {
    image = nil
    guard let url else { return }
@@ -316,8 +417,10 @@ struct Thumbnail: View {
  }
 }
 struct Vibrancy: NSViewRepresentable {
- func makeNSView(context:Context)->NSVisualEffectView { let view=NSVisualEffectView(); view.material = .sidebar; view.blendingMode = .behindWindow; view.state = .followsWindowActiveState; return view }
- func updateNSView(_ view:NSVisualEffectView,context:Context){}
+ var material: NSVisualEffectView.Material = .sidebar
+ var blendingMode: NSVisualEffectView.BlendingMode = .behindWindow
+ func makeNSView(context:Context)->NSVisualEffectView { let view=NSVisualEffectView(); view.material = material; view.blendingMode = blendingMode; view.state = .followsWindowActiveState; return view }
+ func updateNSView(_ view:NSVisualEffectView,context:Context){ view.material = material; view.blendingMode = blendingMode }
 }
 struct FilePane: View {
  @ObservedObject var library:Library; let originals:Bool
@@ -382,13 +485,15 @@ struct FilePane: View {
     .fixedSize()
     .help("Folder options")
     .disabled(library.busy)
-   }.padding(.horizontal, 16).frame(height: 44)
+   }.padding(.horizontal, 16).frame(height: 44).background(Color.black.opacity(0.07))
    Divider()
    ZStack {
     Canvas { context, size in
-     for index in stride(from: 0, to: Int(ceil(size.height / 42)), by: 2) {
-      let rect = CGRect(x:10, y:CGFloat(index)*42, width:max(0,size.width-20), height:42)
-      context.fill(Path(roundedRect:rect,cornerRadius:5),with:.color(.primary.opacity(0.045)))
+     let rowCount = hasFiles ? library.files.count + (originals ? library.unmatchedOriginals.count : 0) : 0
+     let firstEmptyStripe = rowCount + rowCount % 2
+     for index in stride(from: firstEmptyStripe, to: Int(ceil(size.height / 46)), by: 2) {
+      let rect = CGRect(x:8, y:CGFloat(index)*46, width:max(0,size.width-16), height:46)
+      context.fill(Path(roundedRect:rect,cornerRadius:6),with:.color(.black.opacity(0.07)))
      }
     }.allowsHitTesting(false).accessibilityHidden(true)
    if !hasFiles {
@@ -399,7 +504,6 @@ struct FilePane: View {
       .font(.system(size:13,weight:.medium))
      Button("Choose Folder…") { library.choose(originals) }.controlSize(.small).disabled(library.busy)
     }.padding(.vertical,18).padding(.horizontal,24)
-     .background(.regularMaterial,in:RoundedRectangle(cornerRadius:12,style:.continuous))
 
    } else {
     ScrollViewReader { scroll in
@@ -422,7 +526,7 @@ struct FilePane: View {
        )
       }
      }
-    }.scrollContentBackground(.hidden).listStyle(.plain).environment(\.defaultMinListRowHeight,42).disabled(library.busy)
+    }.scrollContentBackground(.hidden).listStyle(.plain).environment(\.defaultMinListRowHeight,46).disabled(library.busy)
      .onChange(of: library.selection) { selection in
       if let selection, library.activeOriginals == originals { scroll.scrollTo(selection) }
      }
@@ -451,7 +555,7 @@ struct FilePane: View {
   .animation(reduceMotion ? nil : .easeOut(duration:0.16),value:hovering)
   .dropDestination(for:URL.self) { urls,_ in library.receive(urls,originals:originals) } isTargeted: { hovering=$0 && !library.busy }
   .onChange(of:library.busy) { if $0 { hovering=false } }
-  .frame(minWidth:280,maxWidth:.infinity,maxHeight:.infinity).background(Color(nsColor:.controlBackgroundColor))
+  .frame(minWidth:280,maxWidth:.infinity,maxHeight:.infinity).background(Vibrancy(material: .underWindowBackground, blendingMode: .behindWindow))
  }
 }
 func category(_ row:MetadataRow)->String {
@@ -487,73 +591,88 @@ struct Inspector: View {
  var previewURL:URL? { if library.mode != .transfer { return library.selectedTargets.first }; return library.activeOriginals ? library.selected?.original : library.selected?.exported }
  var body: some View {
   VStack(spacing:0) {
-   if library.mode == .transfer { HStack { Text("Preview").font(.system(size:12,weight:.semibold)); Spacer(); Button { withAnimation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .easeInOut(duration:0.18)) { library.showInspector=false } } label:{Image(systemName:"sidebar.right")}.buttonStyle(.plain).foregroundStyle(.secondary).help("Hide preview") }.padding(.horizontal,18).frame(height:44)
-   Divider() }
    if let selected=library.selected {
     let visibleRows = rows
     let groupedRows = Dictionary(grouping: visibleRows, by: category)
     ScrollViewReader { scroll in
-     if library.mode == .metadata && !groupedRows.isEmpty {
-      HStack {
-       Text("Metadata").font(.system(size: 12, weight: .semibold))
-       Spacer()
-       Menu("Jump to Section") {
-        ForEach(categories.filter { groupedRows[$0] != nil }, id: \.self) { section in
-         Button(section) {
-          expanded.insert(section)
-          withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { scroll.scrollTo(section, anchor: .top) }
-         }
-        }
-       }.fixedSize().tint(.primary)
-      }.padding(.horizontal, 18).frame(height: 38)
-      Divider()
-     }
     ScrollView {
-     VStack(alignment:.leading,spacing:20) {
-      if !multiSelection && library.mode == .transfer { Thumbnail(url:previewURL).frame(height:180).padding(.vertical,4) }
-      VStack(alignment:.leading,spacing:5) {
-       Text(multiSelection ? "\(library.selectedTargets.count) Files Selected" : (previewURL ?? selected.exported).lastPathComponent)
-        .font(.system(size:15,weight:.semibold)).textSelection(.enabled)
-       Text(multiSelection ? (library.mode == .transfer ? (library.activeOriginals ? "Selected originals" : "Selected exports") : "Selected files") : fileDescription(previewURL ?? selected.exported))
-        .font(.system(size:12)).foregroundStyle(.secondary)
-       if !multiSelection && selected.status == "Matched" {
-        MetadataStatusLabel(title: library.activeOriginals ? "Matched to export" : "Matched to original",
-                            symbol: "checkmark.circle.fill", color: .green)
-         .font(.system(size:10)).padding(.top,3)
+     LazyVStack(alignment:.leading,spacing:0) {
+      VStack(alignment:.leading,spacing:14) {
+       if !multiSelection {
+        Thumbnail(url: previewURL, cornerRadius: 8)
+         .frame(maxWidth: .infinity)
+         .frame(height: 210)
+         .shadow(color: .black.opacity(0.28), radius: 8, y: 3)
+         .padding(.top, 4)
+         .padding(.bottom, 4)
        }
-      }
-      if canCompare && !library.editing {
-       Picker("Metadata",selection:$library.changesOnly) { Text("Differences").tag(true); Text("All Metadata").tag(false) }.pickerStyle(.segmented).labelsHidden()
-      }
-      HStack(spacing:6) {
-       Image(systemName:"magnifyingglass").foregroundStyle(.secondary)
-       TextField("Search metadata",text:$metadataSearch).textFieldStyle(.plain)
-       if !metadataSearch.isEmpty { Button { metadataSearch="" } label:{Image(systemName:"xmark.circle.fill")}.buttonStyle(.plain).foregroundStyle(.secondary).help("Clear search") }
-      }.font(.system(size:11)).padding(7).background(Color.primary.opacity(0.05),in:RoundedRectangle(cornerRadius:6))
-      if library.mode == .transfer { Toggle("Edit metadata", isOn: $library.editing).toggleStyle(.switch).tint(accent.tint).controlSize(.small).disabled(library.busy || library.exif == nil) }
-      if library.editing {
-       let pendingLocations = Set(library.editingTargets.compactMap { library.locationDrafts[$0.path] })
-       if !pendingLocations.isEmpty {
-        MetadataStatusLabel(title: pendingLocations.count == 1 ? "Pending location · " + (pendingLocations.first?.text ?? "") : "Multiple pending locations",
-                            symbol: "mappin.circle").font(.caption)
+       VStack(alignment:.leading,spacing:4) {
+        Text(multiSelection ? "\(library.selectedTargets.count) Files Selected" : (previewURL ?? selected.exported).lastPathComponent)
+         .font(.system(size:16,weight:.semibold)).textSelection(.enabled)
+        Text(multiSelection ? (library.mode == .transfer ? (library.activeOriginals ? "Selected originals" : "Selected exports") : "Selected files") : fileDescription(previewURL ?? selected.exported))
+         .font(.system(size:12.5)).foregroundStyle(.secondary)
+        if !multiSelection && selected.status == "Matched" {
+         MetadataStatusLabel(title: library.activeOriginals ? "Matched to export" : "Matched to original",
+                             symbol: "checkmark.circle.fill", color: .green)
+          .font(.system(size:10)).padding(.top,3)
+        }
        }
-       Text("Blank values remove a tag when saved.").font(.caption).foregroundStyle(.secondary)
-       if library.mode == .transfer && library.selectedTargets.count < 2 { Picker("Edit file", selection: $library.editOriginal) {
-        Text("Export").tag(false)
-        Text("Original").tag(true)
-       }.pickerStyle(.segmented).disabled(library.selected?.original == nil || library.busy) }
-       Text(library.editingTargets.count > 1 ? "Changes apply to all \(library.editingTargets.count) selected files" : library.editingTargets.first?.path ?? "Select a file").font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)
-       HStack {
-        Button("Revert") { for url in library.editingTargets { library.drafts[url.path]=nil; library.locationDrafts[url.path]=nil; library.workflowDrafts[url.path]=nil } }
-         .disabled(!library.editingTargets.contains { library.pendingPaths.contains($0.path) } || library.busy)
-        Spacer()
+       Divider().opacity(0.45)
+       if canCompare && !library.editing {
+        Picker("Metadata",selection:$library.changesOnly) { Text("Differences").tag(true); Text("All Metadata").tag(false) }.pickerStyle(.segmented).labelsHidden()
        }
-       HStack {
-        TextField("Tag, e.g. EXIF:Artist", text: $library.newTag)
-        TextField("Value", text: $library.newValue)
-        Button { library.stage(library.newTag, value: library.newValue); library.newTag=""; library.newValue="" } label: { Image(systemName:"plus.circle") }.disabled(library.newTag.isEmpty)
-       }.textFieldStyle(.roundedBorder).disabled(library.busy || library.reading)
-      }
+       HStack(spacing: 8) {
+        HStack(spacing:6) {
+         Image(systemName:"magnifyingglass").foregroundStyle(.secondary)
+         TextField("Search metadata",text:$metadataSearch).textFieldStyle(.plain)
+         if !metadataSearch.isEmpty { Button { metadataSearch="" } label:{Image(systemName:"xmark.circle.fill")}.buttonStyle(.plain).foregroundStyle(.secondary).help("Clear search") }
+        }.font(.system(size:11)).padding(7).background(.thinMaterial,in:RoundedRectangle(cornerRadius:7,style:.continuous))
+         .overlay(RoundedRectangle(cornerRadius:7,style:.continuous).strokeBorder(Color.primary.opacity(0.08)))
+        if !groupedRows.isEmpty {
+         Menu {
+          ForEach(categories.filter { groupedRows[$0] != nil }, id: \.self) { section in
+           Button(section) {
+            expanded.insert(section)
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { scroll.scrollTo(section, anchor: .top) }
+           }
+          }
+         } label: {
+          Image(systemName: "list.bullet")
+           .font(.system(size: 12))
+           .frame(width: 26, height: 26)
+         }
+         .menuStyle(.borderlessButton)
+         .menuIndicator(.hidden)
+         .fixedSize()
+         .tint(.secondary)
+         .help("Jump to Section")
+        }
+       }
+       if library.mode == .transfer { Toggle("Edit metadata", isOn: $library.editing).toggleStyle(.switch).tint(accent.tint).controlSize(.small).disabled(library.busy || library.exif == nil) }
+       if library.editing {
+        let pendingLocations = Set(library.editingTargets.compactMap { library.locationDrafts[$0.path] })
+        if !pendingLocations.isEmpty {
+         MetadataStatusLabel(title: pendingLocations.count == 1 ? "Pending location · " + (pendingLocations.first?.text ?? "") : "Multiple pending locations",
+                             symbol: "mappin.circle").font(.caption)
+        }
+        Text("Blank values remove a tag when saved.").font(.caption).foregroundStyle(.secondary)
+        if library.mode == .transfer && library.selectedTargets.count < 2 { Picker("Edit file", selection: $library.editOriginal) {
+         Text("Export").tag(false)
+         Text("Original").tag(true)
+        }.pickerStyle(.segmented).disabled(library.selected?.original == nil || library.busy) }
+        Text(library.editingTargets.count > 1 ? "Changes apply to all \(library.editingTargets.count) selected files" : library.editingTargets.first?.path ?? "Select a file").font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)
+        HStack {
+         Button("Revert") { for url in library.editingTargets { library.drafts[url.path]=nil; library.locationDrafts[url.path]=nil; library.workflowDrafts[url.path]=nil } }
+          .disabled(!library.editingTargets.contains { library.pendingPaths.contains($0.path) } || library.busy)
+         Spacer()
+        }
+        HStack {
+         TextField("Tag, e.g. EXIF:Artist", text: $library.newTag)
+         TextField("Value", text: $library.newValue)
+         Button { library.stage(library.newTag, value: library.newValue); library.newTag=""; library.newValue="" } label: { Image(systemName:"plus.circle") }.disabled(library.newTag.isEmpty)
+        }.textFieldStyle(.roundedBorder).disabled(library.busy || library.reading)
+       }
+      }.padding(.bottom, 12)
       if library.reading { ProgressView().frame(maxWidth:.infinity).padding() }
       else {
        if visibleRows.isEmpty { Label(!searchQuery.isEmpty ? "No matching metadata" : differencesOnly ? "No metadata differences" : "No metadata available",systemImage:searchQuery.isEmpty ? "checkmark.circle" : "magnifyingglass").font(.system(size:11)).foregroundStyle(.secondary).padding(.vertical,12) }
@@ -562,44 +681,72 @@ struct Inspector: View {
         let showMap = library.mode == .transfer && section == "Location" && !library.selectedTargets.isEmpty &&
          (searchQuery.isEmpty || "Location GPS Map".localizedCaseInsensitiveContains(searchQuery))
         if !values.isEmpty || showMap {
-         DisclosureGroup(isExpanded:Binding(get:{expanded.contains(section)},set:{ open in withAnimation(reduceMotion ? nil : .easeInOut(duration:0.16)) { if open {expanded.insert(section)} else {expanded.remove(section)} } })) {
-          VStack(spacing:0) {
-           if showMap {
-            if !library.locationPins.isEmpty { LocationMap(pins:library.locationPins).padding(.vertical,8) }
-            Button {
-             library.openMapForSelection()
-            } label: {
-             Label("Open Map Workspace…", systemImage: "mappin.and.ellipse")
-            }
-            .controlSize(.small)
-            .disabled(library.busy || library.exif == nil)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, 8)
+         let isOpen = expanded.contains(section)
+         Button {
+          withAnimation(reduceMotion ? nil : .easeInOut(duration:0.16)) {
+           if isOpen { expanded.remove(section) } else { expanded.insert(section) }
+          }
+         } label: {
+          HStack(spacing: 6) {
+           Image(systemName: "chevron.right")
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .rotationEffect(.degrees(isOpen ? 90 : 0))
+            .frame(width: 10)
+           Text(section).font(.system(size:12,weight:.semibold)).foregroundStyle(.primary)
+           Spacer()
+           if !values.isEmpty {
+            Text("\(values.count)").font(.system(size: 10)).foregroundStyle(.tertiary)
            }
-           ForEach(values) { row in
-            HStack(alignment:.top,spacing:12) {
-             Text(readable(row.name)).font(.system(size:11)).foregroundStyle(.secondary).frame(maxWidth:.infinity,alignment:.leading)
-             VStack(alignment:.trailing,spacing:4) {
-              if library.editing, let tag=editableMetadataTag(row,rows:library.metadata) { MetadataValueEditor(library: library, row: row, tag:tag).disabled(library.busy) }
-              else if row.mixed { MetadataStatusLabel(title: "Multiple values", symbol: "circle.lefthalf.filled") }
-              else {
-               MetadataValueDisplay(row:row, preferOriginal:library.editing ? library.editOriginal : library.activeOriginals, hasOriginal:selected.original != nil)
-               if library.editing { Label(row.group == "Composite" ? "Calculated" : "Read-only",systemImage:"lock").font(.system(size:9)).foregroundStyle(.secondary).help(row.group == "Composite" ? "ExifTool calculates this value from other metadata; edit the underlying capture tags instead." : "This is file information, not an editable metadata field.") }
-              }
-             }.font(.system(size:11)).multilineTextAlignment(.trailing).textSelection(.enabled).frame(maxWidth:.infinity,alignment:.trailing)
-            }.padding(.vertical,7)
-            Divider().opacity(0.5)
+          }
+          .padding(.top, 12)
+          .padding(.bottom, 6)
+          .contentShape(Rectangle())
+         }
+         .buttonStyle(.plain)
+         .id(section)
+         if isOpen {
+          if showMap {
+           if !library.locationPins.isEmpty { LocationMap(pins:library.locationPins).padding(.vertical,8) }
+           Button {
+            library.openMapForSelection()
+           } label: {
+            Label("Open Map Workspace…", systemImage: "mappin.and.ellipse")
            }
-          }.padding(.top,6)
-         } label:{Text(section).font(.system(size:12,weight:.semibold))}.id(section)
+           .controlSize(.small)
+           .disabled(library.busy || library.exif == nil)
+           .frame(maxWidth: .infinity, alignment: .leading)
+           .padding(.bottom, 8)
+          }
+          ForEach(values) { row in
+           HStack(alignment:.top,spacing:12) {
+            Text(readable(row.name)).font(.system(size:11)).foregroundStyle(.secondary).frame(maxWidth:.infinity,alignment:.leading)
+            VStack(alignment:.trailing,spacing:4) {
+             if library.editing, let tag=editableMetadataTag(row,rows:library.metadata) { MetadataValueEditor(library: library, row: row, tag:tag).disabled(library.busy) }
+             else if row.mixed { MetadataStatusLabel(title: "Multiple values", symbol: "circle.lefthalf.filled") }
+             else {
+              MetadataValueDisplay(row:row, preferOriginal:library.editing ? library.editOriginal : library.activeOriginals, hasOriginal:selected.original != nil)
+              if library.editing { Label(row.group == "Composite" ? "Calculated" : "Read-only",systemImage:"lock").font(.system(size:9)).foregroundStyle(.secondary).help(row.group == "Composite" ? "ExifTool calculates this value from other metadata; edit the underlying capture tags instead." : "This is file information, not an editable metadata field.") }
+             }
+            }.font(.system(size:11)).multilineTextAlignment(.trailing).textSelection(.enabled).frame(maxWidth:.infinity,alignment:.trailing)
+           }.padding(.vertical,7)
+           Divider().opacity(0.5)
+          }
+         }
         }
        }
       }
      }.padding(18)
     }
     }
-   } else { Spacer(); VStack(spacing:10){Image(systemName:"doc.text.magnifyingglass").font(.system(size:30,weight:.ultraLight)).foregroundStyle(.tertiary); Text("No Selection").font(.system(size:13,weight:.medium)); Text("Select a file to preview its metadata.").font(.system(size:11)).foregroundStyle(.secondary)}.padding(20); Spacer() }
-  }.frame(minWidth: library.mode == .transfer ? 330 : 480, maxWidth: library.mode == .transfer ? 330 : .infinity, maxHeight:.infinity).background(Vibrancy())
+   } else {
+    VStack(spacing: 0) {
+     Spacer()
+     VStack(spacing:10){Image(systemName:"doc.text.magnifyingglass").font(.system(size:30,weight:.ultraLight)).foregroundStyle(.tertiary); Text("No Selection").font(.system(size:13,weight:.medium)); Text("Select a file to preview its metadata.").font(.system(size:11)).foregroundStyle(.secondary)}.padding(.vertical,20).padding(.horizontal,24).background(.thinMaterial,in:RoundedRectangle(cornerRadius:12,style:.continuous)).overlay(RoundedRectangle(cornerRadius:12,style:.continuous).strokeBorder(Color.primary.opacity(0.08))).padding(20)
+     Spacer()
+    }
+   }
+  }.frame(minWidth: library.mode == .transfer ? 330 : 340, maxWidth: library.mode == .transfer ? 330 : .infinity, maxHeight:.infinity).background(Vibrancy())
 
  }
  func fileDescription(_ url:URL)->String { let values=try? url.resourceValues(forKeys:[.fileSizeKey,.localizedTypeDescriptionKey]); let size=ByteCountFormatter.string(fromByteCount:Int64(values?.fileSize ?? 0),countStyle:.file); return "\(values?.localizedTypeDescription ?? url.pathExtension.uppercased()) · \(size)" }
@@ -607,6 +754,7 @@ struct Inspector: View {
 struct Workspace:View {
  @ObservedObject var library:Library
  @Environment(\.joongaAccent) private var accent
+ @Environment(\.accessibilityReduceMotion) private var reduceMotion
  var body:some View {
   VStack(spacing:0) {
    if library.mode == .transfer {
@@ -628,12 +776,30 @@ struct Workspace:View {
     if library.mode == .transfer {
      Button("Copy Metadata",action:library.transfer).buttonStyle(.borderedProminent).tint(accent.tint).controlSize(.regular).disabled(library.busy || library.matched==0 || library.exif==nil)
     }
-   }.padding(.horizontal,16).frame(height:48)
-  }.sheet(isPresented: $library.showSettings) { SettingsView(library: library) }
+   }.padding(.horizontal,16).frame(height:48).background(Vibrancy(material: .headerView, blendingMode: .behindWindow))
+  }
+  .overlay(alignment: .top) {
+   if let progress = library.loadingProgress {
+    GeometryReader { geo in
+     ZStack(alignment: .leading) {
+      Rectangle().fill(Color.primary.opacity(0.08))
+      Rectangle()
+       .fill(accent.tint)
+       .frame(width: geo.size.width * min(max(progress, 0), 1))
+       .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: progress)
+     }
+    }
+    .frame(height: 2.5)
+    .allowsHitTesting(false)
+    .transition(.opacity)
+   }
+  }
+  .background(Vibrancy(material: .underWindowBackground, blendingMode: .behindWindow).ignoresSafeArea(.all, edges: .top))
+   .sheet(isPresented: $library.showSettings) { SettingsView(library: library) }
    .sheet(isPresented: $library.showWorkflows) { WorkflowView(library:library) }.sheet(isPresented:Binding(get:{library.report != nil && !library.showWorkflows && !library.showSettings},set:{if !$0{library.report=nil}})) { OperationResults(library:library) }
  }
 }
-final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDelegate, NSMenuItemValidation, NSMenuDelegate {
+final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDelegate, NSToolbarItemValidation, NSMenuItemValidation, NSMenuDelegate {
  #if VISUAL_REVIEW
  let library=Library(workflowFile:FileManager.default.temporaryDirectory.appendingPathComponent("MetadataTransfer-Review-" + UUID().uuidString + "/Workflows.json"))
  #else
@@ -641,6 +807,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
  #endif
  private let productName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Joonga Metadata"
  private weak var workflowMenu: NSMenu?
+ private weak var favouritesMenu: NSMenu?
  private var workflowCommandCount = 0
  private var workspaceClosed = false
  private weak var workspaceControl: NSSegmentedControl?
@@ -686,7 +853,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
    }
    previewWindow.enableQuickLook()
   }
-  window.title=productName; window.titlebarAppearsTransparent=true; window.toolbarStyle = .unified; window.minSize=NSSize(width:920,height:540); window.contentView=NSHostingView(rootView: Workspace(library: library).modifier(MacAccentModifier())); let toolbar=NSToolbar(identifier:"WorkspaceToolbar"); toolbar.delegate=self; toolbar.displayMode = .iconOnly; toolbar.centeredItemIdentifiers = [.init("workspace")]; window.toolbar=toolbar; window.center(); window.setFrameAutosaveName("MetadataTransferWorkspace"); window.makeKeyAndOrderFront(nil);
+  window.title=productName; window.titleVisibility = .hidden; window.titlebarAppearsTransparent=true; window.toolbarStyle = .unified; window.styleMask.insert(.fullSizeContentView); window.minSize=NSSize(width:920,height:540); window.contentView=NSHostingView(rootView: Workspace(library: library).modifier(MacAccentModifier())); let toolbar=NSToolbar(identifier:"WorkspaceToolbar"); toolbar.delegate=self; toolbar.displayMode = .iconOnly; toolbar.centeredItemIdentifiers = [.init("workspace")]; window.toolbar=toolbar; window.center(); window.setFrameAutosaveName("MetadataTransferWorkspace"); window.makeKeyAndOrderFront(nil);
   #if VISUAL_REVIEW
   if let sample=Bundle.main.resourceURL?.appendingPathComponent("Samples") {
    library.mode = .transfer; library.source=sample.appendingPathComponent("Originals"); library.destination=sample.appendingPathComponent("Exports"); library.scan()
@@ -696,9 +863,27 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
   #endif
    NSApp.activate(ignoringOtherApps:true)
  }
- func toolbarAllowedItemIdentifiers(_ toolbar:NSToolbar)->[NSToolbarItem.Identifier] { [.init("originals"),.init("exports"),.init("workflows"),.flexibleSpace,.init("workspace"),.flexibleSpace,.init("previous"),.init("next"),.init("refresh"),.init("inspector"),.init("settings")] }
+ func toolbarAllowedItemIdentifiers(_ toolbar:NSToolbar)->[NSToolbarItem.Identifier] {
+  [.init("originals"),.init("clear"),.init("exports"),.init("refresh"),
+   .flexibleSpace,.init("workspace"),.flexibleSpace,
+   .init("workflows"),.init("favourites"),.init("inspector")]
+ }
  func toolbarDefaultItemIdentifiers(_ toolbar:NSToolbar)->[NSToolbarItem.Identifier] { toolbarAllowedItemIdentifiers(toolbar) }
  func toolbar(_ toolbar:NSToolbar,itemForItemIdentifier id:NSToolbarItem.Identifier,willBeInsertedIntoToolbar:Bool)->NSToolbarItem? {
+  if id.rawValue == "favourites" {
+   let item = NSMenuToolbarItem(itemIdentifier: id)
+   item.label = "Favourites"
+   item.toolTip = "Favourite Locations"
+   item.image = NSImage(systemSymbolName: "star", accessibilityDescription: "Favourites")
+   item.showsIndicator = true
+   let menu = NSMenu(title: "Favourites")
+   menu.delegate = self
+   menu.autoenablesItems = false
+   item.menu = menu
+   favouritesMenu = menu
+   updateWorkspaceTool(item, mode: library.mode)
+   return item
+  }
   if id.rawValue == "workspace" {
    let item = NSToolbarItem(itemIdentifier: id)
    item.label = "Workspace"
@@ -716,7 +901,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
    }
    return item
   }
-  let values:[String:(String,String,Selector)] = ["workflows":("Workflows","slider.horizontal.3",#selector(workflows)),"originals":("Add Files or Open Originals","plus",#selector(openOriginals)),"exports":("Open Exports Folder","folder.badge.gearshape",#selector(openExports)),"previous":("Previous File","chevron.left",#selector(previous)),"next":("Next File","chevron.right",#selector(next)),"refresh":("Refresh","arrow.clockwise",#selector(refresh)),"inspector":("Toggle Inspector","sidebar.right",#selector(inspector)),"settings":("Settings","gearshape",#selector(settings))]
+  let values:[String:(String,String,Selector)] = ["workflows":("Workflows","slider.horizontal.3",#selector(workflows)),"originals":("Add Files or Open Originals","plus",#selector(openOriginals)),"clear":("Clear Files","trash",#selector(clearFiles)),"exports":("Open Exports Folder","folder.badge.gearshape",#selector(openExports)),"refresh":("Refresh","arrow.clockwise",#selector(refresh)),"inspector":("Toggle Inspector","sidebar.right",#selector(inspector))]
   guard let (label,icon,action)=values[id.rawValue] else{return nil}
   let item=NSToolbarItem(itemIdentifier:id)
   item.label=label; item.toolTip=label; item.image=NSImage(systemSymbolName:icon,accessibilityDescription:label)
@@ -734,9 +919,15 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
    let label = transferring ? "Open or Choose Originals Folder" : "Add Files or Folders"
    item.label = label; item.toolTip = label
    item.image = NSImage(systemSymbolName: transferring ? "folder" : "plus", accessibilityDescription: label)
-  case "exports", "inspector":
+  case "exports":
    if #available(macOS 15, *) { item.isHidden = !transferring }
    else { item.isEnabled = transferring }
+  case "inspector":
+   if #available(macOS 15, *) { item.isHidden = mode == .map }
+   else { item.isEnabled = mode != .map }
+  case "favourites":
+   if #available(macOS 15, *) { item.isHidden = mode != .map }
+   else { item.isEnabled = mode == .map }
   default: break
   }
  }
@@ -762,6 +953,10 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
   appMenu.addItem(withTitle:"Quit \(productName)",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q")
 
   let file = addMenu("File")
+  command(file, "Add Files or Folders…", #selector(addFilesOrFolders), key: "o").keyEquivalentModifierMask = [.command, .option]
+  command(file, "Remove Selected Files", #selector(removeSelectedFiles))
+  command(file, "Clear All Files", #selector(clearFiles))
+  file.addItem(.separator())
   command(file, "Choose Originals Folder…", #selector(originals), key: "o")
   command(file, "Choose Exports Folder…", #selector(exports), key: "o").keyEquivalentModifierMask = [.command, .shift]
   command(file, "Open Originals in Finder", #selector(openOriginals))
@@ -799,7 +994,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
   command(view, "Previous File", #selector(previous), key: "[").keyEquivalentModifierMask = [.command, .option]
   command(view, "Next File", #selector(next), key: "]").keyEquivalentModifierMask = [.command, .option]
   command(view, "Refresh", #selector(refresh), key: "r")
-  let inspectorItem=view.addItem(withTitle:"Show/Hide Preview",action:#selector(inspector),keyEquivalent:"i"); inspectorItem.target=self; inspectorItem.keyEquivalentModifierMask=[.command,.option]
+  let inspectorItem=view.addItem(withTitle:"Inspect Metadata",action:#selector(inspector),keyEquivalent:"i"); inspectorItem.target=self; inspectorItem.keyEquivalentModifierMask=[.command]
   let windowMenu=addMenu("Window"); NSApp.windowsMenu=windowMenu
   windowMenu.addItem(withTitle:"Minimize",action:#selector(NSWindow.performMiniaturize(_:)),keyEquivalent:"m")
   NSApp.mainMenu=main
@@ -826,6 +1021,21 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
   else if !library.busy { library.chooseMedia() }
  }
  @objc private func openExports() { library.openOrChooseFolder(originals: false) }
+ @objc private func addFilesOrFolders() {
+  if library.mode == .transfer { library.choose(true) }
+  else if !library.busy { library.chooseMedia() }
+ }
+ @objc private func removeSelectedFiles() { library.removeMedia(library.mediaSelection) }
+ @objc private func clearFiles() { library.clearMedia() }
+ private var hasLoadedFiles: Bool {
+  library.mode == .transfer ? (!library.files.isEmpty || !library.unmatchedOriginals.isEmpty || library.source != nil || library.destination != nil) : !library.mediaItems.isEmpty
+ }
+ func validateToolbarItem(_ item: NSToolbarItem) -> Bool {
+  switch item.itemIdentifier.rawValue {
+  case "clear": return !library.busy && !library.mediaLoading && hasLoadedFiles
+  default: return true
+  }
+ }
  @objc private func openWorkflowLibrary() { library.openWorkflowDirectory() }
  @objc private func quickLook() { library.quickLook(library.selectedTargets) }
  @objc private func copyMetadata() { library.transfer() }
@@ -841,6 +1051,48 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
  }
 
  func menuNeedsUpdate(_ menu: NSMenu) {
+  if menu === favouritesMenu {
+   menu.removeAllItems()
+   let saveItem = menu.addItem(withTitle: "Save Current Location…", action: #selector(saveFavouriteLocation), keyEquivalent: "")
+   saveItem.target = self
+   saveItem.isEnabled = !library.busy && (library.selectedMapLocation != nil || library.lastMapPoint != nil)
+   menu.addItem(.separator())
+   let favourites = library.favouriteLocations
+   if favourites.isEmpty {
+    let empty = NSMenuItem(title: "No Saved Favourites", action: nil, keyEquivalent: "")
+    empty.isEnabled = false
+    menu.addItem(empty)
+    return
+   }
+   for favourite in favourites {
+    let item = menu.addItem(withTitle: favourite.name, action: #selector(focusFavouriteLocation(_:)), keyEquivalent: "")
+    item.target = self
+    item.representedObject = favourite.id
+   }
+   menu.addItem(.separator())
+   let applyItem = menu.addItem(withTitle: "Apply to Selection", action: nil, keyEquivalent: "")
+   let applyMenu = NSMenu(title: "Apply to Selection")
+   applyMenu.autoenablesItems = false
+   let canApply = !library.busy && library.exif != nil && !library.mediaSelection.isEmpty
+   applyItem.isEnabled = canApply
+   for favourite in favourites {
+    let sub = applyMenu.addItem(withTitle: favourite.name, action: #selector(applyFavouriteLocation(_:)), keyEquivalent: "")
+    sub.target = self
+    sub.representedObject = favourite.id
+    sub.isEnabled = canApply
+   }
+   applyItem.submenu = applyMenu
+
+   let removeItem = menu.addItem(withTitle: "Remove Favourite", action: nil, keyEquivalent: "")
+   let removeMenu = NSMenu(title: "Remove Favourite")
+   for favourite in favourites {
+    let sub = removeMenu.addItem(withTitle: favourite.name, action: #selector(removeFavouriteLocation(_:)), keyEquivalent: "")
+    sub.target = self
+    sub.representedObject = favourite.id
+   }
+   removeItem.submenu = removeMenu
+   return
+  }
   guard menu === workflowMenu else { return }
   while menu.numberOfItems > workflowCommandCount {
    menu.removeItem(at: menu.numberOfItems - 1)
@@ -872,6 +1124,22 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
  @objc private func pasteLocation() {
   if let point = library.pastedLocation() { library.stageLocation(point, targets: library.selectedTargets) }
  }
+ @objc private func saveFavouriteLocation() { library.requestSaveFavourite = true }
+ @objc private func focusFavouriteLocation(_ item: NSMenuItem) {
+  guard let id = item.representedObject as? UUID,
+        let favourite = library.favouriteLocations.first(where: { $0.id == id }) else { return }
+  library.focusMapPoint(favourite.point)
+ }
+ @objc private func applyFavouriteLocation(_ item: NSMenuItem) {
+  guard let id = item.representedObject as? UUID,
+        let favourite = library.favouriteLocations.first(where: { $0.id == id }) else { return }
+  library.stageLocation(favourite.point, targets: library.selectedTargets)
+  library.focusMapPoint(favourite.point)
+ }
+ @objc private func removeFavouriteLocation(_ item: NSMenuItem) {
+  guard let id = item.representedObject as? UUID else { return }
+  library.removeFavouriteLocation(id: id)
+ }
 
  func validateMenuItem(_ item: NSMenuItem) -> Bool {
   let workspaceAvailable = window != nil && window.attachedSheet == nil && !library.busy
@@ -881,9 +1149,11 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
    return workspaceAvailable
   case #selector(openOriginals): return workspaceAvailable && library.mode == .transfer && library.source != nil
   case #selector(openExports): return workspaceAvailable && library.mode == .transfer && library.destination != nil
+  case #selector(removeSelectedFiles): return workspaceAvailable && library.mode != .transfer && !library.mediaSelection.isEmpty
+  case #selector(clearFiles): return workspaceAvailable && !library.mediaLoading && hasLoadedFiles
   case #selector(copyMetadata): return workspaceAvailable && library.mode == .transfer && library.matched > 0 && library.exif != nil
-  case #selector(copyLocation): return workspaceAvailable && library.mode == .map && library.selectedMapLocation != nil
-  case #selector(pasteLocation): return workspaceAvailable && library.mode == .map && library.exif != nil && !library.selectedTargets.isEmpty
+  case #selector(copyLocation): return workspaceAvailable && library.selectedLocation != nil
+  case #selector(pasteLocation): return workspaceAvailable && library.exif != nil && !library.selectedTargets.isEmpty
   case #selector(applySavedWorkflow(_:)): return canApplySavedWorkflow
   case #selector(saveChanges):
    item.title = library.showWorkflows ? "Save Workflow" : "Save Metadata Changes"
@@ -892,8 +1162,14 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
   case #selector(previous): return workspaceAvailable && library.navigationTarget(-1) != nil
   case #selector(next): return workspaceAvailable && library.navigationTarget(1) != nil
   case #selector(inspector):
-   item.title = library.showInspector ? "Hide Preview" : "Show Preview"
-   return workspaceAvailable && library.mode == .transfer
+   if library.mode == .transfer {
+    item.title = library.showInspector ? "Hide Preview" : "Show Preview"
+   } else if library.mode == .metadata {
+    item.title = library.showInspector ? "Hide Inspector" : "Show Inspector"
+   } else {
+    item.title = "Show Inspector"
+   }
+   return workspaceAvailable
   case #selector(newWorkflow): return library.showWorkflows || workspaceAvailable
   default: return workspaceAvailable
   }
@@ -904,6 +1180,13 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
  @objc func previous(){library.navigate(-1)}
  @objc func next(){library.navigate(1)}
  @objc func refresh(){if !library.busy && !library.mediaLoading { if library.mode == .transfer { library.scan() } else { library.refreshMedia(library.mediaItems.map(\.id)) } }}
- @objc func inspector(){withAnimation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .easeInOut(duration:0.18)){library.showInspector.toggle()}}
+ @objc func inspector(){
+  if library.mode == .map {
+   library.showInspector = true
+   library.mode = .metadata
+  } else {
+   withAnimation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .easeInOut(duration:0.18)){library.showInspector.toggle()}
+  }
+ }
 }
 let application=NSApplication.shared; let delegate=App(); application.delegate=delegate; application.setActivationPolicy(.regular); application.run()

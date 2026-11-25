@@ -27,17 +27,18 @@ struct FileListRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Thumbnail(url: url, quickLookRow: QuickLookRow(id: id, originals: originals))
-                .frame(width: 60, height: 34)
+            Thumbnail(url: url, quickLookRow: QuickLookRow(id: id, originals: originals), contentMode: .fill)
+                .frame(width: 42, height: 34)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(url?.lastPathComponent ?? "No matching original")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 12.5, weight: .medium))
                     .foregroundStyle(rowText)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 if let detail {
                     Text(detail)
-                        .font(.system(size: 10))
+                        .font(.system(size: 10.5))
                         .foregroundStyle(detailText)
                         .lineLimit(1)
                 }
@@ -51,7 +52,7 @@ struct FileListRow: View {
                     .help(status)
             }
         }
-        .frame(height: 42)
+        .frame(height: 46)
         .id(id)
         .tag(id)
         .contextMenu { FileContextMenu(library: library, id: id, originals: originals, url: url) }
@@ -61,20 +62,20 @@ struct FileListRow: View {
     }
 
     private var rowBackground: some View {
-        let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
         return ZStack(alignment: .leading) {
-            Color(nsColor: .controlBackgroundColor)
+            Color.clear
             if isSelected {
                 shape.fill(accent.selectionFill(active: isEmphasized))
             } else {
-                shape.fill(index.isMultiple(of: 2) ? Color.primary.opacity(0.045) : .clear)
+                shape.fill(index.isMultiple(of: 2) ? Color.black.opacity(0.07) : .clear)
                 if matched {
                     shape.fill(Color.green.opacity(0.045))
                     Capsule().fill(Color.green.opacity(0.72)).frame(width: 2).padding(.vertical, 9)
                 }
             }
         }
-        .padding(.horizontal, 10)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .padding(.horizontal, 8)
+        .background(Color.clear)
     }
 }

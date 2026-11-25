@@ -38,27 +38,203 @@ private struct PhotoMapPin: View {
 
 private final class PhotoMapAnnotationView: MKAnnotationView {
     static let size: CGFloat = 44
-    private let hostedPin = NSHostingView(rootView: PhotoMapPin(url: nil, staged: false, size: PhotoMapAnnotationView.size))
+    private let cardLayer = CALayer()
+    private let imageLayer = CALayer()
+    private let stagedDot = CALayer()
+    private var currentURL: URL?
 
     override init(annotation: (any MKAnnotation)?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
         frame.size = NSSize(width: Self.size, height: Self.size)
-        hostedPin.frame = bounds
-        hostedPin.autoresizingMask = [.width, .height]
-        addSubview(hostedPin)
+        wantsLayer = true
+        clusteringIdentifier = "PhotoCluster"
+
+        cardLayer.frame = CGRect(x: 0, y: 0, width: Self.size, height: Self.size)
+        cardLayer.backgroundColor = NSColor.white.cgColor
+        cardLayer.cornerRadius = 6
+        cardLayer.shadowColor = NSColor.black.cgColor
+        cardLayer.shadowOpacity = 0.32
+        cardLayer.shadowRadius = 4
+        cardLayer.shadowOffset = CGSize(width: 0, height: -2)
+
+        imageLayer.frame = CGRect(x: 3, y: 3, width: Self.size - 6, height: Self.size - 6)
+        imageLayer.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        imageLayer.cornerRadius = 3
+        imageLayer.masksToBounds = true
+        imageLayer.contentsGravity = .resizeAspectFill
+        cardLayer.addSublayer(imageLayer)
+
+        stagedDot.frame = CGRect(x: Self.size - 10, y: 2, width: 8, height: 8)
+        stagedDot.backgroundColor = NSColor.systemOrange.cgColor
+        stagedDot.cornerRadius = 4
+        stagedDot.borderColor = NSColor.white.cgColor
+        stagedDot.borderWidth = 1.5
+        stagedDot.isHidden = true
+        cardLayer.addSublayer(stagedDot)
+
+        layer?.addSublayer(cardLayer)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        currentURL = nil
+        imageLayer.contents = nil
+        stagedDot.isHidden = true
+    }
+
     func configure(_ pin: WorkspaceMapView.MediaAnnotation) {
         annotation = pin
-        hostedPin.rootView = PhotoMapPin(url: pin.url, staged: pin.staged, size: Self.size)
-        displayPriority = pin.staged ? .required : .defaultHigh
+        clusteringIdentifier = "PhotoCluster"
+        stagedDot.isHidden = !pin.staged
+        displayPriority = .defaultHigh
         collisionMode = .rectangle
         let label = pin.title ?? ""
         toolTip = pin.staged ? label + " · Pending location" : label
         setAccessibilityLabel(toolTip)
+
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        cardLayer.contentsScale = scale
+        imageLayer.contentsScale = scale
+
+        guard let url = pin.url else {
+            currentURL = nil
+            imageLayer.contents = nil
+            return
+        }
+        guard currentURL != url || imageLayer.contents == nil else { return }
+        currentURL = url
+        if let cached = ThumbnailStore.shared.cache.object(forKey: url as NSURL) {
+            imageLayer.contents = cached
+            return
+        }
+        imageLayer.contents = nil
+        ThumbnailStore.shared.load(url) { [weak self] loaded in
+            guard let self, self.currentURL == url else { return }
+            self.imageLayer.contents = loaded
+        }
+    }
+}
+
+private final class PhotoClusterAnnotationView: MKAnnotationView {
+    static let size: CGFloat = 44
+    static let viewSize: CGFloat = 52
+    private let cardLayer = CALayer()
+    private let imageLayer = CALayer()
+    private let stagedDot = CALayer()
+    private let badgeView = NSView()
+    private let badgeLabel = NSTextField(labelWithString: "")
+    private var currentURL: URL?
+
+    override init(annotation: (any MKAnnotation)?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        frame.size = NSSize(width: Self.viewSize, height: Self.viewSize)
+        centerOffset = NSPoint(x: 4, y: -4)
+        wantsLayer = true
+
+        cardLayer.frame = CGRect(x: 0, y: 0, width: Self.size, height: Self.size)
+        cardLayer.backgroundColor = NSColor.white.cgColor
+        cardLayer.cornerRadius = 6
+        cardLayer.shadowColor = NSColor.black.cgColor
+        cardLayer.shadowOpacity = 0.32
+        cardLayer.shadowRadius = 4
+        cardLayer.shadowOffset = CGSize(width: 0, height: -2)
+
+        imageLayer.frame = CGRect(x: 3, y: 3, width: Self.size - 6, height: Self.size - 6)
+        imageLayer.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        imageLayer.cornerRadius = 3
+        imageLayer.masksToBounds = true
+        imageLayer.contentsGravity = .resizeAspectFill
+        cardLayer.addSublayer(imageLayer)
+
+        stagedDot.frame = CGRect(x: Self.size - 10, y: 2, width: 8, height: 8)
+        stagedDot.backgroundColor = NSColor.systemOrange.cgColor
+        stagedDot.cornerRadius = 4
+        stagedDot.borderColor = NSColor.white.cgColor
+        stagedDot.borderWidth = 1.5
+        stagedDot.isHidden = true
+        cardLayer.addSublayer(stagedDot)
+
+        layer?.addSublayer(cardLayer)
+
+        let accent = MacAccent()
+        badgeView.wantsLayer = true
+        badgeView.layer?.backgroundColor = accent.selectionBackground(active: true).cgColor
+        badgeView.layer?.cornerRadius = 9
+        badgeView.layer?.borderColor = NSColor.white.cgColor
+        badgeView.layer?.borderWidth = 1.5
+        badgeView.layer?.shadowColor = NSColor.black.cgColor
+        badgeView.layer?.shadowOpacity = 0.25
+        badgeView.layer?.shadowRadius = 2
+        badgeView.layer?.shadowOffset = CGSize(width: 0, height: -1)
+
+        badgeLabel.font = .systemFont(ofSize: 10.5, weight: .bold)
+        badgeLabel.textColor = accent.selectionForeground(active: true)
+        badgeLabel.alignment = .center
+        badgeView.addSubview(badgeLabel)
+        addSubview(badgeView)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        currentURL = nil
+        imageLayer.contents = nil
+        stagedDot.isHidden = true
+    }
+
+    func configure(_ cluster: MKClusterAnnotation, accent: MacAccent) {
+        annotation = cluster
+        displayPriority = .defaultHigh
+        collisionMode = .rectangle
+
+        let members = cluster.memberAnnotations.compactMap { $0 as? WorkspaceMapView.MediaAnnotation }
+        let count = members.count
+        let text = count > 99 ? "99+" : "\(count)"
+        badgeView.layer?.backgroundColor = accent.selectionBackground(active: true).cgColor
+        badgeLabel.textColor = accent.selectionForeground(active: true)
+        badgeLabel.stringValue = text
+        badgeLabel.sizeToFit()
+
+        let badgeHeight: CGFloat = 18
+        let badgeWidth = max(badgeHeight, ceil(badgeLabel.frame.width) + 10)
+        badgeView.frame = NSRect(x: Self.viewSize - badgeWidth, y: Self.viewSize - badgeHeight, width: badgeWidth, height: badgeHeight)
+        badgeLabel.frame = NSRect(
+            x: 0,
+            y: floor((badgeHeight - badgeLabel.frame.height) / 2),
+            width: badgeWidth,
+            height: badgeLabel.frame.height
+        )
+
+        let anyStaged = members.contains(where: \.staged)
+        stagedDot.isHidden = !anyStaged
+        toolTip = "\(count) photos" + (anyStaged ? " · Pending location" : "")
+        setAccessibilityLabel(toolTip)
+
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        cardLayer.contentsScale = scale
+        imageLayer.contentsScale = scale
+
+        guard let url = (members.first(where: \.staged) ?? members.first)?.url else {
+            currentURL = nil
+            imageLayer.contents = nil
+            return
+        }
+        guard currentURL != url || imageLayer.contents == nil else { return }
+        currentURL = url
+        if let cached = ThumbnailStore.shared.cache.object(forKey: url as NSURL) {
+            imageLayer.contents = cached
+            return
+        }
+        imageLayer.contents = nil
+        ThumbnailStore.shared.load(url) { [weak self] loaded in
+            guard let self, self.currentURL == url else { return }
+            self.imageLayer.contents = loaded
+        }
     }
 }
 
@@ -134,7 +310,9 @@ struct WorkspaceMapView: NSViewRepresentable {
     let searchSelection: LocationPin?
     var style = WorkspaceMapStyle.standard
     var fitRequest: UUID? = nil
-    let onPinSelect: (String) -> Void
+    var isActive: Bool = true
+    var accent = MacAccent()
+    let onSelect: (Set<String>) -> Void
     let onPick: (CLLocationCoordinate2D) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick) }
@@ -161,9 +339,11 @@ struct WorkspaceMapView: NSViewRepresentable {
     }
 
     func updateNSView(_ view: MKMapView, context: Context) {
+        guard isActive else { return }
         let coordinator = context.coordinator
         coordinator.onPick = onPick
-        coordinator.onPinSelect = onPinSelect
+        coordinator.onSelect = onSelect
+        coordinator.accent = accent
         if view.mapType != style.type { view.mapType = style.type }
         let wasEmpty = coordinator.mediaPins.isEmpty
         coordinator.update(pins: pins, on: view)
@@ -195,7 +375,8 @@ struct WorkspaceMapView: NSViewRepresentable {
 
     final class Coordinator: NSObject, MKMapViewDelegate, NSGestureRecognizerDelegate {
         var onPick: (CLLocationCoordinate2D) -> Void
-        var onPinSelect: ((String) -> Void)?
+        var onSelect: ((Set<String>) -> Void)?
+        var accent = MacAccent()
         var lastFit: UUID?
         var mediaPins: [MediaAnnotation] = []
         private var pinSignature: [String] = []
@@ -218,25 +399,47 @@ struct WorkspaceMapView: NSViewRepresentable {
             true
         }
 
+        private func handleClusterTap(_ cluster: MKClusterAnnotation, on map: MKMapView) {
+            let members = cluster.memberAnnotations.compactMap { $0 as? MediaAnnotation }
+            guard !members.isEmpty else { return }
+            if let minLat = members.map(\.coordinate.latitude).min(),
+               let maxLat = members.map(\.coordinate.latitude).max(),
+               let minLon = members.map(\.coordinate.longitude).min(),
+               let maxLon = members.map(\.coordinate.longitude).max(),
+               (maxLat - minLat) > 0.0002 || (maxLon - minLon) > 0.0002 {
+                map.showAnnotations(members, animated: !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+            } else {
+                onSelect?(Set(members.map(\.id)))
+            }
+        }
+
         @objc func pick(_ gesture: NSClickGestureRecognizer) {
             guard gesture.state == .ended, let map = gesture.view as? MKMapView else { return }
             let point = gesture.location(in: map)
             // Leave the map's native zoom and compass controls to MapKit.
             var hitView = map.hitTest(map.convert(point, to: map.superview))
             while let hit = hitView, hit !== map {
+                if let cluster = (hit as? PhotoClusterAnnotationView)?.annotation as? MKClusterAnnotation {
+                    handleClusterTap(cluster, on: map)
+                    return
+                }
                 if let annotation = (hit as? PhotoMapAnnotationView)?.annotation as? MediaAnnotation {
-                    onPinSelect?(annotation.id)
+                    onSelect?([annotation.id])
                     return
                 }
                 if hit is NSControl { return }
                 hitView = hit.superview
             }
-            if let onPinSelect, let hit = mediaPins.first(where: {
-                guard let view = map.view(for: $0), !view.isHidden, view.alphaValue > 0 else { return false }
-                return view.bounds.contains(view.convert(point, from: map))
-            }) {
-                onPinSelect(hit.id)
-                return
+            for annotation in map.annotations {
+                guard let view = map.view(for: annotation), !view.isHidden, view.alphaValue > 0,
+                      view.bounds.contains(view.convert(point, from: map)) else { continue }
+                if let cluster = annotation as? MKClusterAnnotation {
+                    handleClusterTap(cluster, on: map)
+                    return
+                } else if let pin = annotation as? MediaAnnotation {
+                    onSelect?([pin.id])
+                    return
+                }
             }
             let coordinate = map.convert(point, toCoordinateFrom: map)
             guard CLLocationCoordinate2DIsValid(coordinate) else { return }
@@ -244,6 +447,12 @@ struct WorkspaceMapView: NSViewRepresentable {
         }
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            if let cluster = annotation as? MKClusterAnnotation {
+                let view = mapView.dequeueReusableAnnotationView(withIdentifier: "PhotoCluster") as? PhotoClusterAnnotationView ??
+                    PhotoClusterAnnotationView(annotation: cluster, reuseIdentifier: "PhotoCluster")
+                view.configure(cluster, accent: accent)
+                return view
+            }
             guard let pin = annotation as? MediaAnnotation else { return nil }
             let view = mapView.dequeueReusableAnnotationView(withIdentifier: "PhotoLocation") as? PhotoMapAnnotationView ??
                 PhotoMapAnnotationView(annotation: pin, reuseIdentifier: "PhotoLocation")

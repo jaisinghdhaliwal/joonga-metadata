@@ -113,6 +113,17 @@ struct FileContextMenu: View {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(targets.map(\.path).joined(separator: "\n"), forType: .string)
         }.disabled(targets.isEmpty)
+        Button("Copy Location") {
+            guard targets.count == 1, let target = targets.first,
+                  let point = library.location(for: target.path) else { return }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(point.text, forType: .string)
+        }.disabled(targets.count != 1 || targets.first.flatMap { library.location(for: $0.path) } == nil)
+        Button("Paste Location") {
+            if let point = library.pastedLocation() {
+                library.stageLocation(point, targets: targets)
+            }
+        }.disabled(targets.isEmpty || library.busy || library.exif == nil)
         Button("Apply Workflow…") {
             let ids = originals ? library.originalSelection : library.exportSelection
             if !ids.contains(id) || library.activeOriginals != originals { library.updateSelection([id], originals: originals) }

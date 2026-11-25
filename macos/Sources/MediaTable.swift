@@ -3,40 +3,38 @@ import SwiftUI
 
 struct MediaTable: NSViewRepresentable {
     @ObservedObject var library: Library
-    let compact: Bool
+    let mode: WorkspaceMode
     @Environment(\.joongaAccent) private var accent
 
-    func makeCoordinator() -> Coordinator { Coordinator(library: library, accent: accent, compact: compact) }
+    func makeCoordinator() -> Coordinator { Coordinator(library: library, accent: accent, mode: mode) }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let table = NSTableView()
-        table.headerView = NSTableHeaderView()
-        table.style = .inset
+        let table = TranslucentMediaTable()
+        let header = TranslucentMediaHeaderView()
+        header.menu = context.coordinator.headerMenu
+        table.headerView = header
+        table.style = .plain
+        table.backgroundColor = .clear
         table.allowsMultipleSelection = true
         table.allowsEmptySelection = true
-        table.usesAlternatingRowBackgroundColors = true
-        table.rowHeight = 42
-        table.intercellSpacing = NSSize(width: 8, height: 0)
-        table.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
-        table.setAccessibilityLabel(compact ? "Loaded files" : "File metadata")
+        table.usesAlternatingRowBackgroundColors = false
+        table.allowsColumnReordering = true
+        table.allowsColumnResizing = true
+        table.rowHeight = 46
+        table.intercellSpacing = NSSize(width: 0, height: 0)
+        table.setAccessibilityLabel("Loaded files")
         table.dataSource = context.coordinator
         table.delegate = context.coordinator
         table.target = context.coordinator
         table.doubleAction = #selector(Coordinator.preview(_:))
         table.menu = context.coordinator.fileMenu
-        let keys: [Column] = compact ? [.file] : Column.allCases
-        for field in keys {
-            let col = NSTableColumn(identifier: .init(field.rawValue))
-            col.title = field.rawValue
-            col.minWidth = field == .file ? 165 : 45
-            col.width = field.width
-            col.sortDescriptorPrototype = NSSortDescriptor(key: field.rawValue, ascending: true)
-            table.addTableColumn(col)
-        }
+        context.coordinator.syncColumns(on: table, mode: mode)
         table.sortDescriptors = [NSSortDescriptor(key: Column.file.rawValue, ascending: true)]
         let scroll = NSScrollView()
+        scroll.drawsBackground = false
+        scroll.automaticallyAdjustsContentInsets = false
         scroll.hasVerticalScroller = true
-        scroll.hasHorizontalScroller = !compact
+        scroll.hasHorizontalScroller = true
         scroll.documentView = table
         return scroll
     }
@@ -44,19 +42,66 @@ struct MediaTable: NSViewRepresentable {
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         guard let table = scroll.documentView as? NSTableView else { return }
         context.coordinator.accent = accent
+        context.coordinator.mode = mode
         context.coordinator.update(table)
     }
 
     enum Column: String, CaseIterable {
-        case file = "File", tags = "Tags", make = "Camera Make", date = "Capture Date", gps = "GPS Coordinates", status = "Status"
+        case file = "Filename"
+        case gps = "GPS Coordinates"
+        case road = "Road / Location"
+        case city = "City"
+        case state = "State / Region"
+        case country = "Country"
+        case altitude = "Altitude"
+        case captureDate = "Capture Date"
+        case cameraMake = "Camera Make"
+        case cameraModel = "Camera Model"
+        case lens = "Lens"
+        case dimensions = "Dimensions"
+        case fileSize = "File Size"
+        case fileType = "File Type"
+        case iso = "ISO"
+        case aperture = "Aperture"
+        case shutter = "Shutter Speed"
+        case focalLength = "Focal Length"
+        case tags = "Tags"
+        case status = "Status"
+
+        static let locationColumns: [Column] = [.gps, .road, .city, .state, .country, .altitude]
+        static let metadataColumns: [Column] = [
+            .captureDate, .cameraMake, .cameraModel, .lens, .dimensions, .fileSize, .fileType,
+            .iso, .aperture, .shutter, .focalLength, .tags, .status
+        ]
+
+        static func defaults(for mode: WorkspaceMode) -> [Column] {
+            switch mode {
+            case .metadata: return [.file, .tags, .cameraMake, .captureDate, .gps, .status]
+            case .map, .transfer: return [.file, .gps]
+            }
+        }
+
         var width: CGFloat {
             switch self {
-            case .file: return 330
-            case .tags: return 62
-            case .make: return 135
-            case .date: return 163
-            case .gps: return 176
-            case .status: return 76
+            case .file: return 270
+            case .gps: return 170
+            case .road, .city, .state, .country: return 125
+            case .altitude: return 86
+            case .captureDate: return 155
+            case .cameraMake, .cameraModel: return 130
+            case .lens: return 160
+            case .dimensions: return 100
+            case .fileSize, .fileType, .aperture, .shutter, .focalLength: return 88
+            case .iso, .tags: return 62
+            case .status: return 78
+            }
+        }
+
+        var minWidth: CGFloat {
+            switch self {
+            case .file: return 180
+            case .iso, .tags: return 48
+            default: return 65
             }
         }
     }
@@ -64,11 +109,20 @@ struct MediaTable: NSViewRepresentable {
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSMenuDelegate {
         let library: Library
         var accent: MacAccent
-        let compact: Bool
+        var mode: WorkspaceMode
+        private var activeMode: WorkspaceMode?
+        private var columns: [Column] = []
         private var updating = false
+        private var columnsDirty = false
+        private var lastItemsVersion = -1
+        private var lastPendingVersion = -1
+        private var lastSortKey = ""
+        private var lastSortAscending = true
+        private var lastAccentUsesBrand: Bool?
         private var rows: [MediaItem] = []
         private var snapshot: [String] = []
         private weak var currentTable: NSTableView?
+
         lazy var fileMenu: NSMenu = {
             let menu = NSMenu()
             menu.delegate = self
@@ -76,43 +130,148 @@ struct MediaTable: NSViewRepresentable {
             return menu
         }()
 
-        init(library: Library, accent: MacAccent, compact: Bool) {
+        lazy var headerMenu: NSMenu = {
+            let menu = NSMenu()
+            menu.delegate = self
+            menu.autoenablesItems = false
+            return menu
+        }()
+
+        init(library: Library, accent: MacAccent, mode: WorkspaceMode) {
             self.library = library
             self.accent = accent
-            self.compact = compact
+            self.mode = mode
+        }
+
+        private func defaultsKey(for mode: WorkspaceMode) -> String {
+            "MediaColumns_\(mode.rawValue)"
+        }
+
+        private func savedColumns(for mode: WorkspaceMode) -> [Column] {
+            let raw = UserDefaults.standard.stringArray(forKey: defaultsKey(for: mode)) ?? []
+            var loaded = raw.compactMap(Column.init(rawValue:))
+            if loaded.isEmpty {
+                loaded = Column.defaults(for: mode)
+            } else if !loaded.contains(.file) {
+                loaded.insert(.file, at: 0)
+            }
+            return loaded
+        }
+
+        private func saveColumns(_ columns: [Column], for mode: WorkspaceMode) {
+            UserDefaults.standard.set(columns.map(\.rawValue), forKey: defaultsKey(for: mode))
+        }
+
+        func syncColumns(on table: NSTableView, mode: WorkspaceMode) {
+            activeMode = mode
+            let desired = savedColumns(for: mode)
+            columns = desired
+            columnsDirty = true
+            let wasUpdating = updating
+            updating = true
+
+            let existingByID = Dictionary(uniqueKeysWithValues: table.tableColumns.map { ($0.identifier.rawValue, $0) })
+            let desiredIDs = Set(desired.map(\.rawValue))
+            for col in table.tableColumns where !desiredIDs.contains(col.identifier.rawValue) {
+                table.removeTableColumn(col)
+            }
+
+            let singleColumn = desired.count <= 1
+            table.columnAutoresizingStyle = singleColumn ? .firstColumnOnlyAutoresizingStyle : .noColumnAutoresizing
+
+            for (targetIndex, field) in desired.enumerated() {
+                if let col = existingByID[field.rawValue] {
+                    col.resizingMask = singleColumn ? .autoresizingMask : [.userResizingMask, .autoresizingMask]
+                    if let currentIndex = table.tableColumns.firstIndex(where: { $0 === col }), currentIndex != targetIndex {
+                        table.moveColumn(currentIndex, toColumn: targetIndex)
+                    }
+                } else {
+                    let col = NSTableColumn(identifier: .init(field.rawValue))
+                    col.headerCell = TranslucentMediaHeaderCell(textCell: field.rawValue)
+                    col.title = field.rawValue
+                    col.minWidth = field.minWidth
+                    col.width = field.width
+                    col.resizingMask = singleColumn ? .autoresizingMask : [.userResizingMask, .autoresizingMask]
+                    col.sortDescriptorPrototype = NSSortDescriptor(key: field.rawValue, ascending: true)
+                    table.addTableColumn(col)
+                    let addedIndex = table.tableColumns.count - 1
+                    if addedIndex != targetIndex {
+                        table.moveColumn(addedIndex, toColumn: targetIndex)
+                    }
+                }
+            }
+            if singleColumn {
+                table.sizeToFit()
+            }
+            table.setAccessibilityLabel("Loaded files")
+            updating = wasUpdating
         }
 
         func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
 
         func update(_ table: NSTableView) {
             currentTable = table
+            let modeChanged = activeMode != mode
+            if modeChanged {
+                syncColumns(on: table, mode: mode)
+            }
+
             let sort = table.sortDescriptors.first
-            let field = Column(rawValue: sort?.key ?? "") ?? .file
-            rows = library.mediaItems.sorted { left, right in
-                let result = compare(left, right, by: field)
-                if result == .orderedSame { return left.id.localizedStandardCompare(right.id) == .orderedAscending }
-                return sort?.ascending == false ? result == .orderedDescending : result == .orderedAscending
-            }
-            library.displayedMediaOrder = rows.map(\.id)
-            let newSnapshot = rows.map { item in
-                [item.id, item.make, item.captureDate, String(item.tagCount),
-                 point(item)?.text ?? "", library.hasPending(item.id) ? "1" : "0", library.mode.rawValue].joined(separator: "\u{0}")
-            }
+            let sortKey = sort?.key ?? Column.file.rawValue
+            let sortAscending = sort?.ascending ?? true
+            let itemsVersion = library.mediaItemsVersion
+            let pendingVersion = library.pendingVersion
+            let needsDataUpdate = modeChanged || columnsDirty || lastItemsVersion != itemsVersion ||
+                lastPendingVersion != pendingVersion || lastSortKey != sortKey || lastSortAscending != sortAscending
+
             updating = true
-            if snapshot != newSnapshot {
-                snapshot = newSnapshot
-                table.reloadData()
+            if needsDataUpdate {
+                let field = Column(rawValue: sortKey) ?? .file
+                rows = library.mediaItems.sorted { left, right in
+                    let result = compare(left, right, by: field)
+                    if result == .orderedSame { return left.id.localizedStandardCompare(right.id) == .orderedAscending }
+                    return !sortAscending ? result == .orderedDescending : result == .orderedAscending
+                }
+                library.displayedMediaOrder = rows.map(\.id)
+                let newSnapshot = rows.map { item in
+                    let columnValues = columns.map { value(item, $0) }
+                    return ([item.id, String(item.tags.count), library.hasPending(item.id) ? "1" : "0", mode.rawValue] + columnValues)
+                        .joined(separator: "\u{0}")
+                }
+                if snapshot != newSnapshot {
+                    snapshot = newSnapshot
+                    table.reloadData()
+                }
+                lastItemsVersion = itemsVersion
+                lastPendingVersion = pendingVersion
+                lastSortKey = sortKey
+                lastSortAscending = sortAscending
+                columnsDirty = false
             }
+
             let indices = IndexSet(rows.indices.filter { library.mediaSelection.contains(rows[$0].id) })
-            if indices != table.selectedRowIndexes { table.selectRowIndexes(indices, byExtendingSelection: false) }
-            table.enumerateAvailableRowViews { row, _ in
-                if let row = row as? AccentMediaRow { row.accent = self.accent; row.refresh() }
+            if indices != table.selectedRowIndexes {
+                table.selectRowIndexes(indices, byExtendingSelection: false)
+            }
+            if lastAccentUsesBrand != accent.usesBrandColor {
+                lastAccentUsesBrand = accent.usesBrandColor
+                table.enumerateAvailableRowViews { row, _ in
+                    if let row = row as? AccentMediaRow { row.accent = self.accent; row.refresh() }
+                }
             }
             updating = false
         }
 
         func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
             update(tableView)
+        }
+
+        func tableViewColumnDidMove(_ notification: Notification) {
+            guard !updating, let table = currentTable else { return }
+            let reordered = table.tableColumns.compactMap { Column(rawValue: $0.identifier.rawValue) }
+            guard !reordered.isEmpty else { return }
+            columns = reordered
+            saveColumns(reordered, for: mode)
         }
 
         func tableViewSelectionDidChange(_ notification: Notification) {
@@ -133,12 +292,19 @@ struct MediaTable: NSViewRepresentable {
         func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
             guard let col = tableColumn, let field = Column(rawValue: col.identifier.rawValue), rows.indices.contains(row) else { return nil }
             let item = rows[row]
-            let cell = MediaTableCell()
+            let isFile = field == .file
+            let cellID = NSUserInterfaceItemIdentifier(isFile ? "MediaFileCell" : "MediaTextCell")
+            let cell = (tableView.makeView(withIdentifier: cellID, owner: self) as? MediaTableCell)
+                ?? MediaTableCell(isFileCell: isFile, identifier: cellID)
             cell.toolTip = item.id
             switch field {
             case .file:
-                let detail = library.mode == .map ? point(item)?.text ?? "No location" : item.url.deletingLastPathComponent().path
-                cell.configure(value: item.name, detail: detail, thumbnail: item, pending: compact && library.hasPending(item.id))
+                cell.configure(
+                    value: item.name,
+                    detail: item.folderPath,
+                    thumbnail: item,
+                    pending: library.hasPending(item.id)
+                )
             case .status:
                 cell.configure(value: library.hasPending(item.id) ? "Pending" : "", pending: library.hasPending(item.id))
             default:
@@ -155,6 +321,10 @@ struct MediaTable: NSViewRepresentable {
         }
 
         func menuNeedsUpdate(_ menu: NSMenu) {
+            if menu === headerMenu {
+                buildHeaderMenu(menu)
+                return
+            }
             menu.removeAllItems()
             guard let table = currentTable else { return }
             if rows.indices.contains(table.clickedRow), !table.selectedRowIndexes.contains(table.clickedRow) {
@@ -170,11 +340,99 @@ struct MediaTable: NSViewRepresentable {
                 item.target = self
                 item.isEnabled = !library.busy
             }
+            menu.addItem(.separator())
+            let copyLoc = menu.addItem(withTitle: "Copy Location", action: #selector(copyLocation), keyEquivalent: "")
+            copyLoc.target = self
+            copyLoc.isEnabled = !library.busy && library.selectedMapLocation != nil
+            let pasteLoc = menu.addItem(withTitle: "Paste Location", action: #selector(pasteLocation), keyEquivalent: "")
+            pasteLoc.target = self
+            pasteLoc.isEnabled = !library.busy && library.exif != nil && !library.selectedTargets.isEmpty
+            menu.addItem(.separator())
+            let removeCount = library.mediaSelection.count
+            let removeTitle = removeCount > 1 ? "Remove \(removeCount) Files from List" : "Remove from List"
+            let removeItem = menu.addItem(withTitle: removeTitle, action: #selector(removeSelection), keyEquivalent: "")
+            removeItem.target = self
+            removeItem.isEnabled = !library.busy && !library.mediaSelection.isEmpty
+        }
+
+        private func buildHeaderMenu(_ menu: NSMenu) {
+            menu.removeAllItems()
+            let visible = Set(columns)
+            func addToggleItem(_ col: Column, to targetMenu: NSMenu) {
+                let item = targetMenu.addItem(withTitle: col.rawValue, action: #selector(toggleColumn(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = col.rawValue
+                item.state = visible.contains(col) ? .on : .off
+                item.isEnabled = col != .file
+            }
+
+            if mode == .map {
+                for col in Column.locationColumns { addToggleItem(col, to: menu) }
+                menu.addItem(.separator())
+                let moreItem = menu.addItem(withTitle: "More Metadata", action: nil, keyEquivalent: "")
+                let moreMenu = NSMenu(title: "More Metadata")
+                moreMenu.autoenablesItems = false
+                for col in Column.metadataColumns { addToggleItem(col, to: moreMenu) }
+                moreItem.submenu = moreMenu
+            } else {
+                for col in Column.metadataColumns { addToggleItem(col, to: menu) }
+                menu.addItem(.separator())
+                let locItem = menu.addItem(withTitle: "Location", action: nil, keyEquivalent: "")
+                let locMenu = NSMenu(title: "Location")
+                locMenu.autoenablesItems = false
+                for col in Column.locationColumns { addToggleItem(col, to: locMenu) }
+                locItem.submenu = locMenu
+            }
+
+            menu.addItem(.separator())
+            let noneItem = menu.addItem(withTitle: "None (Filename Only)", action: #selector(clearOptionalColumns), keyEquivalent: "")
+            noneItem.target = self
+            noneItem.isEnabled = columns.count > 1
+            let resetItem = menu.addItem(withTitle: "Reset Columns to Default", action: #selector(resetColumns), keyEquivalent: "")
+            resetItem.target = self
+        }
+
+        @objc private func toggleColumn(_ item: NSMenuItem) {
+            guard let raw = item.representedObject as? String, let col = Column(rawValue: raw),
+                  col != .file, let table = currentTable else { return }
+            var updated = columns
+            if let idx = updated.firstIndex(of: col) {
+                updated.remove(at: idx)
+            } else {
+                updated.append(col)
+            }
+            saveColumns(updated, for: mode)
+            syncColumns(on: table, mode: mode)
+            snapshot = []
+            update(table)
+        }
+
+        @objc private func clearOptionalColumns() {
+            guard let table = currentTable else { return }
+            saveColumns([.file], for: mode)
+            syncColumns(on: table, mode: mode)
+            snapshot = []
+            update(table)
+        }
+
+        @objc private func resetColumns() {
+            guard let table = currentTable else { return }
+            UserDefaults.standard.removeObject(forKey: defaultsKey(for: mode))
+            syncColumns(on: table, mode: mode)
+            snapshot = []
+            update(table)
         }
 
         @objc private func previewSelection() { library.quickLook(library.selectedTargets) }
         @objc private func revealSelection() { NSWorkspace.shared.activateFileViewerSelecting(library.selectedTargets) }
         @objc private func stageWorkflow() { library.showWorkflows = true }
+        @objc private func copyLocation() { library.copySelectedLocation() }
+        @objc private func pasteLocation() {
+            if let point = library.pastedLocation() {
+                library.stageLocation(point, targets: library.selectedTargets)
+            }
+        }
+        @objc private func removeSelection() { library.removeMedia(library.mediaSelection) }
 
         private func point(_ item: MediaItem) -> MapCoordinate? {
             library.locationDrafts[item.id] ?? item.pin.map { MapCoordinate($0.coordinate) }
@@ -183,10 +441,24 @@ struct MediaTable: NSViewRepresentable {
         private func value(_ item: MediaItem, _ field: Column) -> String {
             switch field {
             case .file: return item.name
+            case .gps: return point(item)?.displayText ?? ""
+            case .road: return item.road
+            case .city: return item.city
+            case .state: return item.state
+            case .country: return item.country
+            case .altitude: return item.altitude
+            case .captureDate: return item.captureDate
+            case .cameraMake: return item.make
+            case .cameraModel: return item.model
+            case .lens: return item.lens
+            case .dimensions: return item.dimensions
+            case .fileSize: return item.fileSize
+            case .fileType: return item.fileType
+            case .iso: return item.iso
+            case .aperture: return item.aperture
+            case .shutter: return item.shutter
+            case .focalLength: return item.focalLength
             case .tags: return String(item.tagCount)
-            case .make: return item.make
-            case .date: return item.captureDate
-            case .gps: return point(item)?.text ?? ""
             case .status: return library.hasPending(item.id) ? "Pending" : ""
             }
         }
@@ -222,65 +494,230 @@ private final class AccentMediaRow: NSTableRowView {
     override func drawSelection(in dirtyRect: NSRect) {
         guard isSelected else { return }
         accent.selectionBackground(active: usesEmphasis).setFill()
-        NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 3), xRadius: 6, yRadius: 6).fill()
+        NSBezierPath(roundedRect: bounds.insetBy(dx: 8, dy: 2), xRadius: 6, yRadius: 6).fill()
+    }
+}
+
+private final class TranslucentMediaTable: NSTableView {
+    override func drawBackground(inClipRect clipRect: NSRect) {
+        let pitch = rowHeight + intercellSpacing.height
+        guard pitch > 0 else { return }
+        let origin = numberOfRows > 0 ? rect(ofRow: 0).minY : bounds.minY
+        let first = max(0, Int(floor((clipRect.minY - origin) / pitch)))
+        let end = max(first, Int(ceil((clipRect.maxY - origin) / pitch)))
+        NSColor.black.withAlphaComponent(0.07).setFill()
+        for row in first..<end where row.isMultiple(of: 2) {
+            let stripe = NSRect(x: bounds.minX + 8, y: origin + CGFloat(row) * pitch,
+                                width: max(0, bounds.width - 16), height: rowHeight)
+            NSBezierPath(roundedRect: stripe, xRadius: 6, yRadius: 6).fill()
+        }
+    }
+}
+
+private final class TranslucentMediaHeaderView: NSTableHeaderView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: NSRect(x: 0, y: 0, width: frameRect.width, height: 30))
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.black.withAlphaComponent(0.07).setFill()
+        bounds.fill()
+        super.draw(dirtyRect)
+        NSColor.separatorColor.withAlphaComponent(0.35).setFill()
+        NSRect(x: bounds.minX, y: bounds.maxY - 1, width: bounds.width, height: 1).fill()
+    }
+}
+
+private final class TranslucentMediaHeaderCell: NSTableHeaderCell {
+    override func draw(withFrame cellFrame: NSRect, in controlView: NSView) {
+        if isHighlighted {
+            NSColor.black.withAlphaComponent(0.08).setFill()
+            cellFrame.fill()
+        }
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byTruncatingTail
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 11, weight: .semibold),
+            .foregroundColor: NSColor.secondaryLabelColor,
+            .paragraphStyle: paragraph
+        ]
+        let title = NSAttributedString(string: stringValue, attributes: attrs)
+        let size = title.size()
+        let textRect = NSRect(
+            x: cellFrame.minX + 12,
+            y: cellFrame.minY + floor((cellFrame.height - size.height) / 2),
+            width: max(0, cellFrame.width - 34),
+            height: size.height
+        )
+        title.draw(in: textRect)
+        if cellFrame.maxX < controlView.bounds.maxX - 1 {
+            NSColor.separatorColor.withAlphaComponent(0.25).setFill()
+            NSRect(x: cellFrame.maxX - 1, y: cellFrame.minY + 6, width: 1, height: max(0, cellFrame.height - 12)).fill()
+        }
+    }
+}
+
+private final class MediaThumbnailView: NSView {
+    private let imageLayer = CALayer()
+    private let placeholderView = NSImageView()
+    private let anchorView = ThumbnailAnchorView()
+    private var currentURL: URL?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.cornerRadius = 4
+        layer?.masksToBounds = true
+        layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.06).cgColor
+
+        imageLayer.frame = bounds
+        imageLayer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+        imageLayer.contentsGravity = .resizeAspectFill
+        imageLayer.masksToBounds = true
+        layer?.addSublayer(imageLayer)
+
+        if let symbol = NSImage(systemSymbolName: "photo", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 13, weight: .regular)) {
+            placeholderView.image = symbol
+            placeholderView.contentTintColor = .tertiaryLabelColor
+        }
+        placeholderView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(placeholderView)
+        NSLayoutConstraint.activate([
+            placeholderView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            placeholderView.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+
+        anchorView.frame = bounds
+        anchorView.autoresizingMask = [.width, .height]
+        addSubview(anchorView)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func layout() {
+        super.layout()
+        imageLayer.frame = bounds
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        imageLayer.contentsScale = scale
+    }
+
+    func configure(url: URL, itemID: String) {
+        anchorView.row = QuickLookRow(id: itemID, originals: false)
+        anchorView.url = url
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        imageLayer.contentsScale = scale
+
+        if currentURL == url, imageLayer.contents != nil {
+            return
+        }
+        currentURL = url
+        if let cached = ThumbnailStore.shared.cache.object(forKey: url as NSURL) {
+            imageLayer.contents = cached
+            anchorView.image = cached
+            placeholderView.isHidden = true
+            return
+        }
+        imageLayer.contents = nil
+        anchorView.image = nil
+        placeholderView.isHidden = false
+        ThumbnailStore.shared.load(url) { [weak self] loaded in
+            guard let self, self.currentURL == url else { return }
+            self.imageLayer.contents = loaded
+            self.anchorView.image = loaded
+            self.placeholderView.isHidden = true
+        }
     }
 }
 
 private final class MediaTableCell: NSTableCellView {
     private let titleLabel = NSTextField(labelWithString: "")
-    private var detailLabel: NSTextField?
-    private var pendingIcon: NSImageView?
+    private let detailLabel = NSTextField(labelWithString: "")
+    private let thumbnailView = MediaThumbnailView(frame: NSRect(x: 0, y: 0, width: 42, height: 34))
+    private let pendingIcon = NSImageView()
+    private let isFileCell: Bool
 
-    func configure(value: String, detail: String? = nil, thumbnail: MediaItem? = nil, pending: Bool = false) {
-        titleLabel.stringValue = value
-        titleLabel.font = thumbnail == nil ? .systemFont(ofSize: 12) : .systemFont(ofSize: 12, weight: .medium)
+    init(isFileCell: Bool, identifier: NSUserInterfaceItemIdentifier) {
+        self.isFileCell = isFileCell
+        super.init(frame: .zero)
+        self.identifier = identifier
+
+        titleLabel.font = isFileCell ? .systemFont(ofSize: 12.5, weight: .medium) : .systemFont(ofSize: 12)
         titleLabel.lineBreakMode = .byTruncatingMiddle
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
         var labels: [NSView] = [titleLabel]
-        if let detail {
-            let label = NSTextField(labelWithString: detail)
-            label.font = .systemFont(ofSize: 10)
-            label.lineBreakMode = .byTruncatingMiddle
-            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-            detailLabel = label
-            labels.append(label)
+        if isFileCell {
+            detailLabel.font = .systemFont(ofSize: 10.5)
+            detailLabel.lineBreakMode = .byTruncatingMiddle
+            detailLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            labels.append(detailLabel)
         }
+
         let textStack = NSStackView(views: labels)
         textStack.orientation = .vertical
         textStack.alignment = .leading
         textStack.spacing = 2
+
+        if let symbol = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 6, weight: .regular)) {
+            pendingIcon.image = symbol
+        }
+        pendingIcon.isHidden = true
+
         var views: [NSView] = []
-        if let thumbnail {
-            let image = NSHostingView(rootView: Thumbnail(url: thumbnail.url,
-                quickLookRow: QuickLookRow(id: thumbnail.id, originals: false)).frame(width: 44, height: 31))
-            image.widthAnchor.constraint(equalToConstant: 44).isActive = true
-            image.heightAnchor.constraint(equalToConstant: 31).isActive = true
-            views.append(image)
+        if isFileCell {
+            thumbnailView.translatesAutoresizingMaskIntoConstraints = false
+            thumbnailView.widthAnchor.constraint(equalToConstant: 42).isActive = true
+            thumbnailView.heightAnchor.constraint(equalToConstant: 34).isActive = true
+            views.append(thumbnailView)
         }
         views.append(textStack)
-        if pending, let symbol = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: 6, weight: .regular)) {
-            let icon = NSImageView(image: symbol)
-            pendingIcon = icon
-            views.append(icon)
-        }
+        views.append(pendingIcon)
+
         let contents = NSStackView(views: views)
-        contents.spacing = 9
+        contents.spacing = 10
         contents.alignment = .centerY
         contents.translatesAutoresizingMaskIntoConstraints = false
         addSubview(contents)
+
+        let horizontalInset: CGFloat = isFileCell ? 12 : 10
         NSLayoutConstraint.activate([
-            contents.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
-            contents.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -4),
+            contents.leadingAnchor.constraint(equalTo: leadingAnchor, constant: horizontalInset),
+            contents.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -horizontalInset),
             contents.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func configure(value: String, detail: String? = nil, thumbnail: MediaItem? = nil, pending: Bool = false) {
+        titleLabel.stringValue = value
+        if isFileCell {
+            detailLabel.stringValue = detail ?? ""
+            if let thumbnail {
+                thumbnailView.configure(url: thumbnail.url, itemID: thumbnail.id)
+            }
+        }
+        pendingIcon.isHidden = !pending
         setAccessibilityLabel([value, detail, pending ? "Pending changes" : nil].compactMap { $0 }.joined(separator: ", "))
         applySelection(nil)
     }
 
     func applySelection(_ foreground: NSColor?) {
         titleLabel.textColor = foreground ?? .labelColor
-        detailLabel?.textColor = foreground ?? .secondaryLabelColor
-        pendingIcon?.contentTintColor = foreground ?? .systemOrange
+        if isFileCell {
+            detailLabel.textColor = foreground ?? .secondaryLabelColor
+        }
+        pendingIcon.contentTintColor = foreground ?? .systemOrange
     }
 }

@@ -18,6 +18,8 @@ jobs:
         run: |
           bash macos/build.command
           test -s "macos/build/Joonga Metadata.app/Contents/Resources/Assets.car"
+          test -x "macos/build/Joonga Metadata.app/Contents/Resources/exiftool/exiftool"
+          "macos/build/Joonga Metadata.app/Contents/Resources/exiftool/exiftool" -ver
           xcrun lipo "macos/build/Joonga Metadata.app/Contents/MacOS/Joonga Metadata" -verify_arch arm64 x86_64
           codesign --verify --strict --all-architectures "macos/build/Joonga Metadata.app"
       - name: Package the app

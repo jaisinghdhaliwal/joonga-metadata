@@ -276,7 +276,7 @@ struct WorkflowView: View {
                         .disabled(library.presets.isEmpty)
                 }.fixedSize()
                 Button("Done") { if resolveEdits() { dismiss() } }.keyboardShortcut(.cancelAction)
-            }.tint(.primary).controlSize(.small).padding(.horizontal, 18).frame(height: 50)
+            }.tint(.primary).controlSize(.small).padding(.horizontal, 18).frame(height: 50).background(.ultraThinMaterial)
             Divider()
             HStack(spacing: 0) {
                 VStack(spacing: 0) {
@@ -312,7 +312,7 @@ struct WorkflowView: View {
                     }.buttonStyle(.borderless).tint(.primary).padding(12)
                 }.frame(width: 230).background(Vibrancy())
                 Divider()
-                if hasEditor { editor }
+                if hasEditor { editor.background(Vibrancy(material: .underWindowBackground, blendingMode: .behindWindow)) }
                 else {
                     VStack(spacing: 14) {
                         Image(systemName: selectedIDs.count > 1 ? "square.stack" : "slider.horizontal.3")
@@ -322,7 +322,13 @@ struct WorkflowView: View {
                         Text(selectedIDs.count > 1 ? "Export your selection to use it on another Mac,\nor select one workflow to edit it." : "Save repeatable metadata edits, then apply them\nto the files you select.")
                             .font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center)
                         if selectedIDs.isEmpty { Button("New Workflow", action: newWorkflow).buttonStyle(.borderedProminent).tint(accent.tint) }
-                    }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    .padding(28)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.primary.opacity(0.08)))
+                    .padding(24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Vibrancy(material: .underWindowBackground, blendingMode: .behindWindow))
                 }
             }
             Divider()
@@ -330,7 +336,7 @@ struct WorkflowView: View {
                 Image(systemName: transferStatus.isEmpty ? "internaldrive" : "info.circle")
                 Text(transferStatus.isEmpty ? "Saved on this Mac · Import and export to share workflows" : transferStatus).lineLimit(2)
                 Spacer()
-            }.font(.system(size: 10)).foregroundStyle(.secondary).padding(.horizontal, 16).frame(height: 34)
+            }.font(.system(size: 10)).foregroundStyle(.secondary).padding(.horizontal, 16).frame(height: 34).background(.ultraThinMaterial)
         }.frame(width: 800, height: 610)
         .interactiveDismissDisabled(dirty)
         .confirmationDialog("Delete \(selectedIDs.count) workflows?", isPresented: $confirmingDelete) {
@@ -367,7 +373,7 @@ struct WorkflowView: View {
                             .padding(.horizontal, 13).padding(.vertical, 10).allowsHitTesting(false)
                     }
                 }
-            }.background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+            }.background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8))
                 .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.12)))
                 .frame(minHeight: 180)
             if let validation = validation {

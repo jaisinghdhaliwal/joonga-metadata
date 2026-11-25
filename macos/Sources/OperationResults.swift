@@ -15,13 +15,13 @@ struct OperationResults: View {
                 }
                 Spacer()
                 Button("Done") { library.report = nil }.keyboardShortcut(.defaultAction)
-            }.padding(18)
+            }.padding(18).background(.ultraThinMaterial)
             Divider()
             ScrollView {
                 Text(library.report ?? "").font(.system(size: 11, design: .monospaced))
                     .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .topLeading).padding(18)
-            }.background(Color(nsColor: .textBackgroundColor))
+            }.background(Color(nsColor: .textBackgroundColor).opacity(0.7))
             Divider()
             HStack {
                 Button("Copy Results") {
@@ -30,7 +30,7 @@ struct OperationResults: View {
                 }
                 Spacer()
                 Text("Original files are backed up by ExifTool.").font(.caption).foregroundStyle(.secondary)
-            }.padding(14)
-        }.frame(width: 720, height: 480)
+            }.padding(14).background(.ultraThinMaterial)
+        }.frame(width: 720, height: 480).background(Vibrancy(material: .underWindowBackground, blendingMode: .behindWindow))
     }
 }
