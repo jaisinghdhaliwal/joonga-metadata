@@ -430,6 +430,7 @@ struct MediaWorkspace: View {
                 else { MediaTable(library: library, mode: library.mode) }
             }
             .frame(minWidth: 240, maxWidth: .infinity)
+            .layoutPriority(1)
             .background(Vibrancy(material: .underWindowBackground, blendingMode: .behindWindow))
 
             if library.mode == .map || library.showInspector {
@@ -444,7 +445,7 @@ struct MediaWorkspace: View {
                         Inspector(library: library)
                     }
                 }
-                .frame(minWidth: library.mode == .map ? 460 : 360, idealWidth: 440, maxWidth: .infinity)
+                .frame(minWidth: library.mode == .map ? 460 : 360, idealWidth: library.mode == .map ? 460 : 360, maxWidth: .infinity)
             }
         }
         .onAppear {
@@ -587,11 +588,11 @@ private struct WorkspaceMap: View {
                     }
                     .padding(.horizontal, 14)
                     .frame(height: 36)
-                    .frame(minWidth: 220, maxWidth: 320)
+                    .frame(minWidth: 90, maxWidth: 320)
                     .mapControlSurface(in: Capsule(), interactive: true)
 
                     Button(action: find) {
-                        Text("Search")
+                        Image(systemName: "magnifyingglass").accessibilityLabel("Search")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(accent.selectionText(active: true))
                             .padding(.horizontal, 16)
@@ -607,7 +608,7 @@ private struct WorkspaceMap: View {
                         Toggle("Show Selected Files Only", isOn: $selectedOnly)
                         Button("Fit Visible Pins") { fitRequest = UUID() }.disabled(pins.isEmpty)
                     } label: {
-                        Label("Map Options", systemImage: "map")
+                        Label("Map Options", systemImage: "map").labelStyle(.iconOnly)
                             .font(.system(size: 13, weight: .medium))
                     }
                     .menuStyle(.borderlessButton)

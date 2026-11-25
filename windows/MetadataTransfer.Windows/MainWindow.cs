@@ -25,6 +25,7 @@ public sealed partial class MainWindow : Window
     private readonly TextBlock status=UI.Muted("Drop files or folders into either pane"),selectionCount=UI.Muted("");
     private readonly ProgressBar progress=new(){Height=3,Minimum=0,Maximum=1,Visibility=Visibility.Collapsed};
     private readonly Button copy,cancel;
+    private readonly Button pendingFiles=new(), favouritesArrow=new();
     private readonly Button previewPaneButton = new();
     private readonly StackPanel folderCommands = UI.Horizontal();
     private readonly Dictionary<string,Dictionary<string,string>> drafts=new(StringComparer.OrdinalIgnoreCase);
@@ -43,7 +44,11 @@ public sealed partial class MainWindow : Window
         top.Children.Add(progress);
         var footer=new DockPanel{Margin=new Thickness(16,8,12,10)};copy=UI.Button("Copy metadata",()=>CopyMetadata());cancel=UI.Button("Cancel",()=>{operation?.Cancel();status.Text="Stopping…";});cancel.Visibility=Visibility.Collapsed;
         saveAll=UI.Button("Save changes",SaveEdits);
-        var right=UI.Horizontal(selectionCount,cancel,saveAll,copy);DockPanel.SetDock(right,Dock.Right);footer.Children.Add(right);footer.Children.Add(status);DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);
+        saveAll.SetResourceReference(StyleProperty,"AccentButtonStyle");
+        saveAll.SetResourceReference(Control.BackgroundProperty,SystemColors.HighlightBrushKey);
+        saveAll.SetResourceReference(Control.ForegroundProperty,SystemColors.HighlightTextBrushKey);
+        pendingFiles.Click+=(_,_)=>UI.Results(this,"Files with unsaved changes","Save Changes writes the staged metadata to these files."+Environment.NewLine+string.Join(Environment.NewLine,PendingPaths.OrderBy(path=>path).Select(path=>Path.GetFileName(path))));
+        var right=UI.Horizontal(selectionCount,cancel,pendingFiles,saveAll,copy);DockPanel.SetDock(right,Dock.Right);footer.Children.Add(right);footer.Children.Add(status);DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);
         workspace.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star),MinWidth=280});workspace.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(5)});workspace.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star),MinWidth=280});workspace.ColumnDefinitions.Add(inspectorDivider);workspace.ColumnDefinitions.Add(inspectorColumn);
         workspace.Children.Add(originals);Grid.SetColumn(exports,2);workspace.Children.Add(exports);Grid.SetColumn(inspector,4);workspace.Children.Add(inspector);
         for(var i=1;i<4;i+=2){var splitter=new GridSplitter{Width=5,HorizontalAlignment=HorizontalAlignment.Stretch,VerticalAlignment=VerticalAlignment.Stretch,Background=Brushes.Transparent,ResizeBehavior=GridResizeBehavior.PreviousAndNext};Grid.SetColumn(splitter,i);workspace.Children.Add(splitter);}
@@ -135,15 +140,18 @@ public sealed partial class MainWindow : Window
         UI.StyleIconButton(previewPaneButton, "\uE8FF", "Preview pane", "Ctrl+I");
         UpdatePreviewButton(true);
         previewPaneButton.Click += (_, _) => ToggleInspector();
-        mapFavourites=UI.IconButton("\uE734","Map favourites");
-        mapFavourites.Click+=(_,_)=>mapPane?.OpenFavourites(mapFavourites);
+        mapFavourites=UI.IconButton("\uE734","Add favourite location");
+        mapFavourites.Click+=(_,_)=>mapPane?.SaveFavourite();
+        UI.StyleIconButton(favouritesArrow,"\uE70D","Manage favourite locations");
+        favouritesArrow.Width=28;
+        favouritesArrow.Click+=(_,_)=>mapPane?.OpenFavourites(favouritesArrow);
 
         var more = UI.IconButton("\uE712", "More actions");
         more.Click += (_, _) => ShowMoreActions(more);
         var left = UI.Horizontal(folderCommands, separator, workflows);
         var right = UI.Horizontal(
             UI.IconButton("\uE72C", "Refresh", Refresh, "F5"),
-            mapFavourites,
+            mapFavourites,favouritesArrow,
             previewPaneButton,
             UI.IconButton("\uE713", "Settings", ShowSettings, "Ctrl+,"),
             more);
@@ -385,7 +393,9 @@ public sealed partial class MainWindow : Window
         var locations=paths.Where(locationDrafts.ContainsKey).Select(path=>locationDrafts[path]).ToArray();
         inspector.SetPendingLocation(locations);
         var pending=PendingPaths.Length;
-        saveAll.Content=pending==0?"Save changes":$"Save changes ({pending})";
+        var label=UI.Text("");UI.SetStatusText(label,$"{pending} pending",UI.Orange);
+        pendingFiles.Content=label;
+        pendingFiles.Visibility=pending>0?Visibility.Visible:Visibility.Collapsed;
         saveAll.IsEnabled=!busy&&exif is not null&&pending>0;
         UpdatePendingRows();
     }

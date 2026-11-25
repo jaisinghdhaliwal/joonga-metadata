@@ -202,6 +202,11 @@ inspired by Apple Photos.
 
 ### Current state (2026-11-25)
 
+- The map star adds a favourite and its arrow opens the saved list, including removal.
+  Cluster counts sit at the top right without a border. Map search uses an icon.
+  Metadata opens with a compact inspector. The pending count opens a list of
+  affected filenames, and the file grid marks edits beside the filename.
+
 - Functional parity across platforms is a product requirement. Use the
   platform's native UI conventions for equivalent controls and compare both
   implementations during feature work.

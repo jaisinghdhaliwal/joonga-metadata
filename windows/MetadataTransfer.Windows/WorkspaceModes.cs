@@ -105,6 +105,11 @@ public sealed partial class MainWindow
             if(property==nameof(WorkspaceMedia.Folder)) label.SetValue(OpacityProperty,0.68);
             labels.AppendChild(label);
         }
+        var dot=new FrameworkElementFactory(typeof(TextBlock));
+        dot.SetValue(TextBlock.TextProperty,"●");dot.SetValue(TextBlock.ForegroundProperty,UI.Orange);
+        dot.SetValue(DockPanel.DockProperty,Dock.Right);dot.SetValue(VerticalAlignmentProperty,VerticalAlignment.Center);
+        dot.SetBinding(VisibilityProperty,new Binding(nameof(WorkspaceMedia.HasPending)){Converter=new BooleanToVisibilityConverter()});
+        filename.AppendChild(dot);
         filename.AppendChild(labels);
         var fileColumn = new DataGridTemplateColumn
         {
@@ -117,7 +122,6 @@ public sealed partial class MainWindow
         AddColumn("Capture date",nameof(WorkspaceMedia.CaptureDate),new DataGridLength(170),110);
         AddColumn("GPS coordinates",nameof(WorkspaceMedia.Coordinates),new DataGridLength(175),150,
             nameof(WorkspaceMedia.GpsOrder));
-        AddColumn("Status",nameof(WorkspaceMedia.Status),new DataGridLength(75),64);
         foreach(var (label,property) in new (string,string)[]
         {
             ("Road / Location",nameof(WorkspaceMedia.Road)), ("City",nameof(WorkspaceMedia.City)),
@@ -138,7 +142,7 @@ public sealed partial class MainWindow
                 menu.IsOpen=true;
                 e.Handled=true;
             })));
-        mediaList.ColumnHeaderStyle.Setters.Add(new Setter(Control.BackgroundProperty,UI.Subtle));
+        mediaList.ColumnHeaderStyle.Setters.Add(new Setter(Control.BackgroundProperty,Brushes.Transparent));
         mediaList.ColumnHeaderStyle.Setters.Add(new Setter(FrameworkElement.HeightProperty,30d));
         mediaList.SelectionChanged+=(_,_)=>
         {
@@ -216,7 +220,7 @@ public sealed partial class MainWindow
     private static string[] DefaultMediaColumns(WorkspaceMode workspaceMode) => workspaceMode==WorkspaceMode.Map
         ? [nameof(WorkspaceMedia.Name),nameof(WorkspaceMedia.Coordinates)]
         : [nameof(WorkspaceMedia.Name),nameof(WorkspaceMedia.TagCount),nameof(WorkspaceMedia.Make),
-            nameof(WorkspaceMedia.CaptureDate),nameof(WorkspaceMedia.Coordinates),nameof(WorkspaceMedia.Status)];
+            nameof(WorkspaceMedia.CaptureDate),nameof(WorkspaceMedia.Coordinates)];
 
     private void ApplyMediaColumns()
     {
@@ -284,8 +288,8 @@ public sealed partial class MainWindow
         bool show=map||settings.ShowInspector;
         double minimum=map?460:340;
         mediaFilesColumn.MinWidth=show?235:0;
-        double windowWidth=ActualWidth>0?ActualWidth:Width;
-        mediaFilesColumn.Width=show?new GridLength(Math.Clamp(settings.MediaPaneWidth,235,Math.Max(235,windowWidth-minimum-20))):new GridLength(1,GridUnitType.Star);
+        double windowWidth=mediaWorkspace.ActualWidth>0?mediaWorkspace.ActualWidth:Width;
+        mediaFilesColumn.Width=show?new GridLength(Math.Clamp(settings.MediaPaneWidth>0?settings.MediaPaneWidth:(map?440:windowWidth-minimum-5),235,Math.Max(235,windowWidth-minimum-5))):new GridLength(1,GridUnitType.Star);
         mediaGutter.Width=new GridLength(show?5:0);
         mediaDetail.MinWidth=show?minimum:0;
         mediaDetail.Width=show?new GridLength(1,GridUnitType.Star):new GridLength(0);
@@ -297,8 +301,8 @@ public sealed partial class MainWindow
     private void ConstrainMediaPane()
     {
         double minimum=mode==WorkspaceMode.Map?460:340;
-        double width=ActualWidth>0?ActualWidth:Width;
-        mediaFilesColumn.MaxWidth=mediaGutter.Width.Value>0?Math.Max(235,width-minimum-12):double.PositiveInfinity;
+        double width=mediaWorkspace.ActualWidth>0?mediaWorkspace.ActualWidth:Width;
+        mediaFilesColumn.MaxWidth=mediaGutter.Width.Value>0?Math.Max(235,width-minimum-5):double.PositiveInfinity;
     }
 
     private void SetMode(WorkspaceMode value)
@@ -313,7 +317,7 @@ public sealed partial class MainWindow
         for(var i=2;i<folderCommands.Children.Count;i++)folderCommands.Children[i].Visibility=transfer?Visibility.Visible:Visibility.Collapsed;
         copy.Visibility=transfer?Visibility.Visible:Visibility.Collapsed;
         previewPaneButton.Visibility=value==WorkspaceMode.Map?Visibility.Collapsed:Visibility.Visible;
-        mapFavourites.Visibility=value==WorkspaceMode.Map?Visibility.Visible:Visibility.Collapsed;
+        favouritesArrow.Visibility=mapFavourites.Visibility=value==WorkspaceMode.Map?Visibility.Visible:Visibility.Collapsed;
         workspace.Children.Remove(inspector);mediaWorkspace.Children.Remove(inspector);
         if(transfer)
         {
@@ -630,6 +634,7 @@ internal sealed class WorkspaceMedia(string path) : INotifyPropertyChanged
     public string Coordinates=>EffectiveLocation is { } point?string.Create(CultureInfo.InvariantCulture,$"{point.Latitude:F7}, {point.Longitude:F7}"):"";
     public (int HasLocation,double Latitude,double Longitude) GpsOrder => EffectiveLocation is { } point
         ? (1,point.Latitude,point.Longitude) : (0,0,0);
+    public bool HasPending=>pending;
     public string Status=>pending?"Pending":readError is not null?"Read error":"";
     public event PropertyChangedEventHandler? PropertyChanged;
     private string Tag(params string[] names)=>names.Select(name=>Tags.GetValueOrDefault(name)??

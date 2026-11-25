@@ -164,7 +164,7 @@ private final class PhotoClusterAnnotationView: MKAnnotationView {
         badgeView.layer?.backgroundColor = accent.selectionBackground(active: true).cgColor
         badgeView.layer?.cornerRadius = 9
         badgeView.layer?.borderColor = NSColor.white.cgColor
-        badgeView.layer?.borderWidth = 1.5
+        badgeView.layer?.borderWidth = 0
         badgeView.layer?.shadowColor = NSColor.black.cgColor
         badgeView.layer?.shadowOpacity = 0.25
         badgeView.layer?.shadowRadius = 2
@@ -202,7 +202,7 @@ private final class PhotoClusterAnnotationView: MKAnnotationView {
 
         let badgeHeight: CGFloat = 18
         let badgeWidth = max(badgeHeight, ceil(badgeLabel.frame.width) + 10)
-        badgeView.frame = NSRect(x: Self.viewSize - badgeWidth, y: Self.viewSize - badgeHeight, width: badgeWidth, height: badgeHeight)
+        badgeView.frame = NSRect(x: Self.viewSize - badgeWidth, y: isFlipped ? 0 : Self.viewSize - badgeHeight, width: badgeWidth, height: badgeHeight)
         badgeLabel.frame = NSRect(
             x: 0,
             y: floor((badgeHeight - badgeLabel.frame.height) / 2),

@@ -71,12 +71,12 @@ struct MediaTable: NSViewRepresentable {
         static let locationColumns: [Column] = [.gps, .road, .city, .state, .country, .altitude]
         static let metadataColumns: [Column] = [
             .captureDate, .cameraMake, .cameraModel, .lens, .dimensions, .fileSize, .fileType,
-            .iso, .aperture, .shutter, .focalLength, .tags, .status
+            .iso, .aperture, .shutter, .focalLength, .tags
         ]
 
         static func defaults(for mode: WorkspaceMode) -> [Column] {
             switch mode {
-            case .metadata: return [.file, .tags, .cameraMake, .captureDate, .gps, .status]
+            case .metadata: return [.file, .tags, .cameraMake, .captureDate, .gps]
             case .map, .transfer: return [.file, .gps]
             }
         }
@@ -149,7 +149,7 @@ struct MediaTable: NSViewRepresentable {
 
         private func savedColumns(for mode: WorkspaceMode) -> [Column] {
             let raw = UserDefaults.standard.stringArray(forKey: defaultsKey(for: mode)) ?? []
-            var loaded = raw.compactMap(Column.init(rawValue:))
+            var loaded = raw.compactMap(Column.init(rawValue:)).filter { $0 != .status }
             if loaded.isEmpty {
                 loaded = Column.defaults(for: mode)
             } else if !loaded.contains(.file) {
@@ -515,6 +515,7 @@ private final class TranslucentMediaTable: NSTableView {
 }
 
 private final class TranslucentMediaHeaderView: NSTableHeaderView {
+    override var isOpaque: Bool { false }
     override init(frame frameRect: NSRect) {
         super.init(frame: NSRect(x: 0, y: 0, width: frameRect.width, height: 30))
     }
@@ -525,7 +526,16 @@ private final class TranslucentMediaHeaderView: NSTableHeaderView {
     override func draw(_ dirtyRect: NSRect) {
         NSColor.black.withAlphaComponent(0.07).setFill()
         bounds.fill()
-        super.draw(dirtyRect)
+        if let table = tableView {
+            for (index,column) in table.tableColumns.enumerated() {
+                let rect = headerRect(ofColumn: index)
+                guard rect.intersects(dirtyRect) else { continue }
+                column.headerCell.draw(withFrame: rect, in: self)
+                if let sort = table.sortDescriptors.first, sort.key == column.sortDescriptorPrototype?.key {
+                    column.headerCell.drawSortIndicator(withFrame: rect, in: self, ascending: sort.ascending, priority: 0)
+                }
+            }
+        }
         NSColor.separatorColor.withAlphaComponent(0.35).setFill()
         NSRect(x: bounds.minX, y: bounds.maxY - 1, width: bounds.width, height: 1).fill()
     }

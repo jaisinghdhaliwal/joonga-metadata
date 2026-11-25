@@ -57,7 +57,7 @@ internal sealed class Inspector : DockPanel
         metadataControls.Children.Add(UI.Muted("Search metadata"));search.Margin=new Thickness(0,4,0,6);
         metadataControls.Children.Add(search);
         metadataControls.Children.Add(UI.Horizontal(differences,edit));
-        save=UI.Button("Save changes",()=>SaveRequested?.Invoke(),"Write changes to every selected file · Ctrl+S");revert=UI.Button("Revert",()=>RevertRequested?.Invoke());
+        save=UI.Button("Save changes",()=>SaveRequested?.Invoke(),"Write changes to every selected file · Ctrl+S");save.SetResourceReference(Control.BackgroundProperty,SystemColors.HighlightBrushKey);save.SetResourceReference(Control.ForegroundProperty,SystemColors.HighlightTextBrushKey);revert=UI.Button("Revert",()=>RevertRequested?.Invoke());
         editingControls.Children.Add(UI.Muted("Blank values remove a tag when saved."));
         editingControls.Children.Add(UI.Horizontal(revert,save));editingControls.Children.Add(count);editingControls.Children.Add(pendingLocation);
         pendingLocation.Visibility=Visibility.Collapsed;
@@ -186,7 +186,8 @@ internal sealed class Inspector : DockPanel
                     if(mixedDrafts||underlying.Mixed&&draft is null)
                         UI.SetStatusText(hint,hint.Text,UI.Orange);
                     hint.Visibility=hint.Text.Length==0?Visibility.Collapsed:Visibility.Visible;
-                    box.TextChanged+=(_,_)=>{Stage?.Invoke(f.WriteTag,box.Text);UI.SetStatusText(hint,"Unsaved",null);hint.Visibility=Visibility.Visible;};
+                    var displayedValue=box.Text;
+                    box.TextChanged+=(_,_)=>{if(box.Text==displayedValue)return;displayedValue=box.Text;Stage?.Invoke(f.WriteTag,box.Text);UI.SetStatusText(hint,"Unsaved",null);hint.Visibility=Visibility.Visible;};
                     valuePanel.Children.Add(box);valuePanel.Children.Add(hint);
                     if(f.Group=="Composite")valuePanel.Children.Add(UI.Muted("Edits "+Metadata.Readable(f.WriteTag.Split(':').Last()),9));
                 }

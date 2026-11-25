@@ -138,7 +138,10 @@ struct MetadataValueEditor: View {
         VStack(alignment: .trailing, spacing: 4) {
             TextField(storedRow.mixed || mixedPending ? "Multiple values" : "Enter value…", text: Binding(
                 get: { mixedPending ? "" : (pendingValues.first ?? nil) ?? (storedRow.mixed || current == "—" ? "" : current) },
-                set: { library.stage(tag, value: $0) }
+                set: { value in
+                    let displayed = mixedPending ? "" : (pendingValues.first ?? nil) ?? (storedRow.mixed || current == "—" ? "" : current)
+                    if value != displayed { library.stage(tag, value: value) }
+                }
             ))
             .textFieldStyle(.roundedBorder)
             .multilineTextAlignment(.leading)

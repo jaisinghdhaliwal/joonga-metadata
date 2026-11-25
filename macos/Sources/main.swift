@@ -752,6 +752,7 @@ struct Inspector: View {
  func fileDescription(_ url:URL)->String { let values=try? url.resourceValues(forKeys:[.fileSizeKey,.localizedTypeDescriptionKey]); let size=ByteCountFormatter.string(fromByteCount:Int64(values?.fileSize ?? 0),countStyle:.file); return "\(values?.localizedTypeDescription ?? url.pathExtension.uppercased()) · \(size)" }
 }
 struct Workspace:View {
+ @State private var showPendingFiles = false
  @ObservedObject var library:Library
  @Environment(\.joongaAccent) private var accent
  @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -767,7 +768,17 @@ struct Workspace:View {
     Spacer()
     Text("\(library.selectedTargets.count) selected").font(.system(size:10)).foregroundStyle(.secondary)
     if !library.pendingPaths.isEmpty {
-     MetadataStatusLabel(title: "\(library.pendingPaths.count) pending", symbol: "circle.fill")
+     Button { showPendingFiles.toggle() } label: {
+      MetadataStatusLabel(title: "\(library.pendingPaths.count) pending", symbol: "circle.fill")
+     }.buttonStyle(.plain).popover(isPresented: $showPendingFiles) {
+      VStack(alignment: .leading, spacing: 8) {
+       Text("Files with unsaved changes").font(.headline)
+       Text("Save Changes writes the staged metadata to these files.").font(.caption)
+       ScrollView { VStack(alignment: .leading) { ForEach(library.pendingPaths.sorted(), id: \.self) { path in
+        Text(URL(fileURLWithPath: path).lastPathComponent).help(path)
+       } } }.frame(maxHeight: 240)
+      }.padding()
+     }
       .font(.caption)
      Button("Save Changes", action: library.saveEdits).buttonStyle(.borderedProminent).tint(accent.tint).disabled(library.busy || library.mediaLoading)
     } else if library.mode != .transfer {
@@ -853,7 +864,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
    }
    previewWindow.enableQuickLook()
   }
-  window.title=productName; window.titleVisibility = .hidden; window.titlebarAppearsTransparent=true; window.toolbarStyle = .unified; window.styleMask.insert(.fullSizeContentView); window.minSize=NSSize(width:920,height:540); window.contentView=NSHostingView(rootView: Workspace(library: library).modifier(MacAccentModifier())); let toolbar=NSToolbar(identifier:"WorkspaceToolbar"); toolbar.delegate=self; toolbar.displayMode = .iconOnly; toolbar.centeredItemIdentifiers = [.init("workspace")]; window.toolbar=toolbar; window.center(); window.setFrameAutosaveName("MetadataTransferWorkspace"); window.makeKeyAndOrderFront(nil);
+  window.title=productName; window.titleVisibility = .hidden; window.titlebarAppearsTransparent=false; window.toolbarStyle = .unified; window.styleMask.insert(.fullSizeContentView); window.minSize=NSSize(width:920,height:540); window.contentView=NSHostingView(rootView: Workspace(library: library).modifier(MacAccentModifier())); let toolbar=NSToolbar(identifier:"WorkspaceToolbar"); toolbar.delegate=self; toolbar.displayMode = .iconOnly; toolbar.centeredItemIdentifiers = [.init("workspace")]; window.toolbar=toolbar; window.center(); window.setFrameAutosaveName("MetadataTransferWorkspace"); window.makeKeyAndOrderFront(nil);
   #if VISUAL_REVIEW
   if let sample=Bundle.main.resourceURL?.appendingPathComponent("Samples") {
    library.mode = .transfer; library.source=sample.appendingPathComponent("Originals"); library.destination=sample.appendingPathComponent("Exports"); library.scan()
@@ -876,6 +887,8 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
    item.toolTip = "Favourite Locations"
    item.image = NSImage(systemSymbolName: "star", accessibilityDescription: "Favourites")
    item.showsIndicator = true
+   item.target = self
+   item.action = #selector(saveFavouriteLocation)
    let menu = NSMenu(title: "Favourites")
    menu.delegate = self
    menu.autoenablesItems = false
@@ -1124,7 +1137,13 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
  @objc private func pasteLocation() {
   if let point = library.pastedLocation() { library.stageLocation(point, targets: library.selectedTargets) }
  }
- @objc private func saveFavouriteLocation() { library.requestSaveFavourite = true }
+ @objc private func saveFavouriteLocation() {
+  guard library.selectedMapLocation != nil || library.lastMapPoint != nil else {
+   library.message = "Pick a map point or select a geotagged file to save a favourite."
+   return
+  }
+  library.requestSaveFavourite = true
+ }
  @objc private func focusFavouriteLocation(_ item: NSMenuItem) {
   guard let id = item.representedObject as? UUID,
         let favourite = library.favouriteLocations.first(where: { $0.id == id }) else { return }

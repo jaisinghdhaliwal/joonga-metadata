@@ -42,7 +42,7 @@ internal sealed class MapPane : DockPanel, IDisposable
         this.settings=settings;this.saveSettings=saveSettings;this.sourcePoint=sourcePoint;this.stage=stage;this.selectFiles=selectFiles;
         Margin=new Thickness(10,8,10,8);
         var header = new StackPanel { Margin = new Thickness(0, 0, 0, 8) };
-        search = UI.Button("Search", () => _ = FindPlaces());
+        search = UI.IconButton("\uE721","Search for a place", () => _ = FindPlaces());
         var options = UI.IconButton("\uE909","Map options");
         options.Click+=(_,_)=>OpenMapOptions(options);
         var searchRow = new DockPanel();
@@ -350,9 +350,9 @@ internal sealed class MapPane : DockPanel, IDisposable
         menu.IsOpen=true;
     }
 
-    private void SaveFavourite()
+    public void SaveFavourite()
     {
-        if((lastPoint??sourcePoint()) is not { } point)return;
+        if((lastPoint??sourcePoint()) is not { } point){SetSearchStatus("Pick a point on the map or select a geotagged file first.");return;}
         var dialog=UI.Window("Save favourite location",380,180,Window.GetWindow(this));
         dialog.MinHeight=160;
         var panel=new StackPanel{Margin=new Thickness(16)};

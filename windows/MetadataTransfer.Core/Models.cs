@@ -85,7 +85,7 @@ public sealed class Settings
     public string? DefaultExports { get; set; }
     public string? ExifTool { get; set; }
     public bool ShowInspector { get; set; } = true;
-    public double MediaPaneWidth { get; set; } = 440;
+    public double MediaPaneWidth { get; set; } = 0;
     public Dictionary<string, List<string>> MediaColumns { get; set; } = [];
     public double Width { get; set; } = 1360;
     public double Height { get; set; } = 860;
