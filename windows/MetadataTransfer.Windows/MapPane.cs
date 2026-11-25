@@ -22,15 +22,11 @@ internal sealed class MapPane : DockPanel, IDisposable
     private readonly Action saveSettings;
     private readonly Func<GeoPoint?> sourcePoint;
     private readonly Action<double,double> stage;
-    private readonly Action<string> selectFile;
-    private readonly CheckBox selectedOnly = new() { Content = "Selected only" };
-    private readonly ComboBox style = new() { ItemsSource = new[] { "Normal", "Hybrid", "Satellite" }, SelectedIndex = 0, MinWidth = 100 };
-    private readonly Button copyLocation, pasteLocation, favouritesButton;
+    private readonly Action<string[]> selectFiles;
     private GeoPoint? lastPoint;
     private HashSet<string> selection = [], staged = [];
     private bool canWrite, initialized, fitted;
     private string? pinSignature;
-    private readonly Button pickCentre;
     private readonly TextBox query = UI.Input("Search for a place or address");
     private readonly ComboBox places = new() { DisplayMemberPath = nameof(PlaceSearch.Result.Title), MaxDropDownHeight = 220 };
     private readonly TextBlock searchStatus = UI.Muted("");
@@ -41,28 +37,23 @@ internal sealed class MapPane : DockPanel, IDisposable
     private bool ready;
 
     public MapPane(Settings settings, Action saveSettings, Func<GeoPoint?> sourcePoint,
-        Action<double,double> stage, Action<string> selectFile)
+        Action<double,double> stage, Action<string[]> selectFiles)
     {
-        this.settings=settings;this.saveSettings=saveSettings;this.sourcePoint=sourcePoint;this.stage=stage;this.selectFile=selectFile;
+        this.settings=settings;this.saveSettings=saveSettings;this.sourcePoint=sourcePoint;this.stage=stage;this.selectFiles=selectFiles;
         Margin=new Thickness(10,8,10,8);
         var header = new StackPanel { Margin = new Thickness(0, 0, 0, 8) };
-        if(style.Items.Contains(settings.MapStyle))style.SelectedItem=settings.MapStyle;
-        selectedOnly.IsChecked=settings.MapShowsSelectedOnly;
-        var options=UI.Horizontal(UI.Button("Fit pins",()=>{if(ready)Post(new { kind="fit" });}),style,selectedOnly);
-        options.HorizontalAlignment=HorizontalAlignment.Right;
-        selectedOnly.Margin=new Thickness(10,0,0,0);
-        selectedOnly.Checked+=(_,_)=>SaveFilter();
-        selectedOnly.Unchecked+=(_,_)=>SaveFilter();
-        style.SelectionChanged+=(_,_)=>{if(style.SelectedItem is string value){settings.MapStyle=value;saveSettings();SendStyle();}};
-        System.Windows.Automation.AutomationProperties.SetName(style,"Map style");
-        header.Children.Add(options);
         search = UI.Button("Search", () => _ = FindPlaces());
-        var searchLabel = UI.Muted("Search for a place or address");
-        searchLabel.Margin = new Thickness(0, 10, 0, 0);
-        header.Children.Add(searchLabel);
+        var options = UI.IconButton("\uE909","Map options");
+        options.Click+=(_,_)=>OpenMapOptions(options);
         var searchRow = new DockPanel();
+        DockPanel.SetDock(options, Dock.Right);
+        searchRow.Children.Add(options);
         DockPanel.SetDock(search, Dock.Right);
         searchRow.Children.Add(search);
+        var clearQuery=UI.IconButton("\uE711","Clear search",()=>{query.Clear();query.Focus();});
+        clearQuery.Visibility=Visibility.Collapsed;
+        DockPanel.SetDock(clearQuery,Dock.Right);
+        searchRow.Children.Add(clearQuery);
         query.Margin = new Thickness(0, 3, 6, 3);
         searchRow.Children.Add(query);
         header.Children.Add(searchRow);
@@ -76,6 +67,7 @@ internal sealed class MapPane : DockPanel, IDisposable
         query.IsEnabled = false;
         query.TextChanged += (_, _) =>
         {
+            clearQuery.Visibility=query.Text.Length==0?Visibility.Collapsed:Visibility.Visible;
             places.ItemsSource = null;
             places.Visibility = Visibility.Collapsed;
             SetSearchStatus(pendingSearch is null ? null : "Searching…");
@@ -92,16 +84,11 @@ internal sealed class MapPane : DockPanel, IDisposable
             if (!ready || places.SelectedItem is not PlaceSearch.Result place) return;
             if(canWrite&&selection.Count>0)stage(place.Latitude,place.Longitude);
             FocusPoint(place.Latitude, place.Longitude);
+            places.Visibility=Visibility.Collapsed;
         };
 
-        pickCentre = UI.Button("Use map centre", () => Post(new { kind = "pick-center" }));
-        pickCentre.IsEnabled = false;
-        copyLocation=UI.Button("Copy location",CopyLocation,"Copy location · Ctrl+Shift+C");
-        pasteLocation=UI.Button("Paste location",PasteLocation,"Paste location · Ctrl+Shift+V");
-        favouritesButton=UI.Button("Favourites",OpenFavourites);
         var footer=new StackPanel{Margin=new Thickness(0,8,0,0)};
         footer.Children.Add(coordinates);
-        footer.Children.Add(UI.Horizontal(copyLocation,pasteLocation,favouritesButton,pickCentre));
         SetDock(header,Dock.Top);SetDock(footer,Dock.Bottom);
         Children.Add(header);Children.Add(footer);
         var loading = UI.Muted("Loading map…", 13);
@@ -231,7 +218,15 @@ internal sealed class MapPane : DockPanel, IDisposable
         }
         else if (kind.GetString()=="file" && message.TryGetProperty("id",out var id) && id.ValueKind==JsonValueKind.String)
         {
-            if(id.GetString() is string path && locations.Any(point=>point.Path==path))selectFile(path);
+            if(id.GetString() is string path && locations.Any(point=>point.Path==path))selectFiles([path]);
+        }
+        else if(kind.GetString()=="cluster"&&message.TryGetProperty("ids",out var ids)&&ids.ValueKind==JsonValueKind.Array)
+        {
+            var visible=locations.Where(point=>!settings.MapShowsSelectedOnly||selection.Contains(point.Path))
+                .Select(point=>point.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var members=ids.EnumerateArray().Where(id=>id.ValueKind==JsonValueKind.String)
+                .Select(id=>id.GetString()).OfType<string>().Where(visible.Contains).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            if(members.Length>0)selectFiles(members);
         }
         else if (kind.GetString()=="request-thumbnail" && message.TryGetProperty("id",out var thumbnailId) &&
             thumbnailId.ValueKind==JsonValueKind.String && thumbnailId.GetString() is string thumbnailPath)
@@ -284,7 +279,7 @@ internal sealed class MapPane : DockPanel, IDisposable
     private void UpdatePins()
     {
         if(!ready)return;
-        var pins=locations.Where(point=>selectedOnly.IsChecked!=true||selection.Contains(point.Path))
+        var pins=locations.Where(point=>!settings.MapShowsSelectedOnly||selection.Contains(point.Path))
             .Select(point=>new { id=point.Path, name=Path.GetFileName(point.Path), latitude=point.Latitude,longitude=point.Longitude,
                 pending=staged.Contains(point.Path),selected=selection.Contains(point.Path) }).ToArray();
         var signature=JsonSerializer.Serialize(pins);
@@ -296,21 +291,33 @@ internal sealed class MapPane : DockPanel, IDisposable
 
     private void SendStyle()
     {
-        if(ready&&style.SelectedItem is string value)Post(new { kind="style",value=value.ToLowerInvariant() });
+        if(ready)Post(new { kind="style",value=settings.MapStyle.ToLowerInvariant() });
     }
 
-    private void SaveFilter()
+    private void OpenMapOptions(Button anchor)
     {
-        settings.MapShowsSelectedOnly=selectedOnly.IsChecked==true;
-        saveSettings();
-        UpdatePins();
+        var menu=new ContextMenu{PlacementTarget=anchor,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom};
+        foreach(var value in new[]{"Normal","Hybrid","Satellite"})
+        {
+            var item=new MenuItem{Header=value,IsCheckable=true,IsChecked=settings.MapStyle==value};
+            item.Click+=(_,_)=>{settings.MapStyle=value;saveSettings();SendStyle();};
+            menu.Items.Add(item);
+        }
+        menu.Items.Add(new Separator());
+        var selected=new MenuItem{Header="Show selected files only",IsCheckable=true,IsChecked=settings.MapShowsSelectedOnly};
+        selected.Click+=(_,_)=>{settings.MapShowsSelectedOnly=selected.IsChecked;saveSettings();UpdatePins();};
+        menu.Items.Add(selected);
+        var fit=new MenuItem{Header="Fit visible pins",IsEnabled=ready&&locations.Any(point=>!settings.MapShowsSelectedOnly||selection.Contains(point.Path))};
+        fit.Click+=(_,_)=>Post(new { kind="fit" });
+        menu.Items.Add(fit);
+        var centre=new MenuItem{Header="Use map centre",IsEnabled=ready&&canWrite&&selection.Count>0};
+        centre.Click+=(_,_)=>Post(new { kind="pick-center" });
+        menu.Items.Add(centre);
+        menu.IsOpen=true;
     }
 
     private void UpdateActions()
     {
-        copyLocation.IsEnabled=sourcePoint() is not null;
-        pasteLocation.IsEnabled=canWrite&&selection.Count>0;
-        pickCentre.IsEnabled=ready&&pasteLocation.IsEnabled;
         coordinates.Text=sourcePoint() is { } point
             ? string.Create(CultureInfo.InvariantCulture,$"{point.Latitude:F6}, {point.Longitude:F6}")+(staged.Contains(point.Path)?" · Pending":"")
             : selection.Count==0?"Select a file to set its location":$"Click the map to set location for {selection.Count} selected";
@@ -322,30 +329,9 @@ internal sealed class MapPane : DockPanel, IDisposable
         if(ready)Post(new { kind="focus",latitude,longitude });
     }
 
-    public void CopyLocation()
+    public void OpenFavourites(Button anchor)
     {
-        if(sourcePoint() is { } point)
-        {
-            try { Clipboard.SetText(string.Create(CultureInfo.InvariantCulture,$"{point.Latitude:F7}, {point.Longitude:F7}")); }
-            catch(System.Runtime.InteropServices.ExternalException) { SetSearchStatus("Clipboard is in use. Try again."); }
-        }
-    }
-
-    public void PasteLocation()
-    {
-        if(!canWrite||selection.Count==0)return;
-        string[] parts;
-        try { parts=Clipboard.GetText().Split(','); }
-        catch(System.Runtime.InteropServices.ExternalException) { SetSearchStatus("Clipboard is in use. Try again.");return; }
-        if(parts.Length==2&&double.TryParse(parts[0],NumberStyles.Float,CultureInfo.InvariantCulture,out var lat)&&
-            double.TryParse(parts[1],NumberStyles.Float,CultureInfo.InvariantCulture,out var lon)&&lat is >= -90 and <= 90&&lon is >= -180 and <= 180)
-        { stage(lat,lon);FocusPoint(lat,lon); }
-        else SetSearchStatus("Clipboard has no valid latitude and longitude.");
-    }
-
-    private void OpenFavourites()
-    {
-        var menu=new ContextMenu{PlacementTarget=favouritesButton};
+        var menu=new ContextMenu{PlacementTarget=anchor,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom};
         MenuItem Item(string title,Action action,bool enabled=true)
         {
             var item=new MenuItem{Header=title.Replace("_","__"),IsEnabled=enabled};

@@ -53,7 +53,7 @@ try
         }
         foreach (var extension in new[] { "jpg", "mp4" })
         {
-            var path = Path.Combine(root, "geotag." + extension);
+            var path = Path.Combine(root, "géotag sample." + extension);
             File.Copy(Path.Combine(AppContext.BaseDirectory, "Fixtures", "sample." + extension), path);
             const double latitude = -33.4578123, longitude = -70.6482764;
             var result = await exif.WriteLocationAsync(path, latitude, longitude, ["-Artist=Workspace draft"]);
@@ -69,6 +69,13 @@ try
             Check(result.Success && point is { Latitude: 0, Longitude: 0 } && File.Exists(path + "_original"),
                 extension + " replaces the pin with zero coordinates and keeps the backup");
         }
+        var jpeg = Path.Combine(root,"géotag sample.jpg");
+        var video = Path.Combine(root,"géotag sample.mp4");
+        var noGps = Path.Combine(root,"edit.jpg");
+        var batch = await exif.ReadWorkspaceBatchAsync([jpeg,video,noGps,Path.Combine(root,"missing.jpg")],CancellationToken.None);
+        Check(batch.Count==3&&batch[jpeg].Location is {Latitude:0,Longitude:0}&&
+            batch[video].Location is {Latitude:0,Longitude:0}&&batch[noGps].Location is null&&
+            batch[jpeg].Tags.Values.Contains("Workspace draft"),"batch returns usable JPEG, MP4 and untagged rows despite a missing file");
     }
     else Console.WriteLine("SKIP ExifTool integration: pass the executable path to enable it.");
     Console.WriteLine($"{passed} checks passed.");

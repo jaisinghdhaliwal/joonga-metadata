@@ -41,6 +41,7 @@ internal sealed class FilePane : DockPanel
     public event Action? SelectionChanged;
     public event Action? PreviewRequested;
     public event Action? WorkflowRequested;
+    public event Action? CopyLocationRequested, PasteLocationRequested;
     public string? Folder {get;set;}
     public FilePane(bool originals)
     {
@@ -90,7 +91,7 @@ internal sealed class FilePane : DockPanel
         dropOutline.SetResourceReference(Border.BorderBrushProperty,SystemColors.HighlightBrushKey);
         content.Children.Add(dropOutline);
         Children.Add(content);
-        var style=new Style(typeof(ListViewItem),(Style)FindResource("WorkspaceListItemStyle"));style.Setters.Add(new Setter(System.Windows.Automation.AutomationProperties.NameProperty,new Binding("AccessibleName")));style.Setters.Add(new Setter(HeightProperty,44d));style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty,HorizontalAlignment.Stretch));style.Setters.Add(new Setter(Control.PaddingProperty,new Thickness(8,2,10,2)));style.Setters.Add(new Setter(Control.MarginProperty,new Thickness(0,0,6,0)));style.Setters.Add(new Setter(ToolTipProperty,new Binding("Path")));style.Setters.Add(new Setter(IsEnabledProperty, new Binding(nameof(FileRow.CanSelect))));List.ItemContainerStyle=style;
+        var style=new Style(typeof(ListViewItem),(Style)FindResource("WorkspaceListItemStyle"));style.Setters.Add(new Setter(System.Windows.Automation.AutomationProperties.NameProperty,new Binding("AccessibleName")));style.Setters.Add(new Setter(HeightProperty,UI.FileRowHeight));style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty,HorizontalAlignment.Stretch));style.Setters.Add(new Setter(Control.PaddingProperty,new Thickness(8,2,10,2)));style.Setters.Add(new Setter(Control.MarginProperty,new Thickness(0,0,6,0)));style.Setters.Add(new Setter(ToolTipProperty,new Binding("Path")));style.Setters.Add(new Setter(IsEnabledProperty, new Binding(nameof(FileRow.CanSelect))));List.ItemContainerStyle=style;
         var root=new FrameworkElementFactory(typeof(DockPanel));
         root.AddHandler(LoadedEvent,new RoutedEventHandler((sender,_)=>{if(sender is FrameworkElement { DataContext: FileRow row })row.Load();}));
         var dot=new FrameworkElementFactory(typeof(TextBlock));dot.SetBinding(TextBlock.TextProperty,new Binding("Indicator"));dot.SetBinding(TextBlock.ForegroundProperty,new Binding("StatusBrush"));dot.SetValue(TextBlock.FontFamilyProperty,UI.IconFont);dot.SetValue(DockPanel.DockProperty,Dock.Right);dot.SetValue(VerticalAlignmentProperty,VerticalAlignment.Center);dot.SetValue(MarginProperty,new Thickness(8,0,0,0));root.AppendChild(dot);
@@ -122,6 +123,8 @@ internal sealed class FilePane : DockPanel
         FileAction("Open",()=>{foreach(var p in SelectedPaths)UI.Open(p);});
         FileAction("Show in Explorer",()=>{if(SelectedPaths.FirstOrDefault() is string p)UI.Reveal(p);});
         FileAction("Copy paths",()=>{if(SelectedPaths.Length>0)Clipboard.SetText(string.Join(Environment.NewLine,SelectedPaths));});
+        FileAction("Copy location",()=>CopyLocationRequested?.Invoke());
+        FileAction("Paste location",()=>PasteLocationRequested?.Invoke());
         FileAction("Apply workflow…",()=>WorkflowRequested?.Invoke());List.ContextMenu=fileMenu;
         AllowDrop=true;
         DragOver+=(_,e)=>

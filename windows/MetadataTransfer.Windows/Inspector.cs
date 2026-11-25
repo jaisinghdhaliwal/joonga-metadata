@@ -76,7 +76,9 @@ internal sealed class Inspector : DockPanel
     {
         workspaceEditing=enabled;
         heading.Text=enabled?"Metadata":"Preview";
-        close.Visibility=edit.Visibility=differences.Visibility=save.Visibility=enabled?Visibility.Collapsed:Visibility.Visible;
+        close.Visibility=Visibility.Visible;
+        edit.Visibility=differences.Visibility=save.Visibility=enabled?Visibility.Collapsed:Visibility.Visible;
+        image.Height=enabled?210:172;
         Render();
     }
     public void SetBusy(bool value)
@@ -112,8 +114,10 @@ internal sealed class Inspector : DockPanel
         title.Text=paths.Length==0?"No selection":paths.Length==1?Path.GetFileName(paths[0]):$"{paths.Length} files selected";
         description.Text=paths.Length==0?"Select a file to preview its metadata.":paths.Length==1?paths[0]:$"Selected {side.ToLowerInvariant()}";
         description.ToolTip=string.Join(Environment.NewLine,paths);Render();
-        return SetThumbnail(paths.Length==1&&!workspaceEditing?paths[0]:null);
+        return SetThumbnail(paths.Length==1?paths[0]:null);
     }
+
+    public GeoPoint? LocationFor(string path) => locations.FirstOrDefault(point=>point.Path.Equals(path,StringComparison.OrdinalIgnoreCase));
 
     private async Task SetThumbnail(string? path)
     {

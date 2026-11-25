@@ -54,19 +54,21 @@ public sealed partial class MainWindow : Window
         {
             pane.ChooseRequested+=()=>Choose(pane);pane.FilesDropped+=(paths,_)=>Receive(pane,paths);pane.ClearRequested+=()=>Clear(pane);
             pane.SelectionChanged+=()=>Selected(pane);pane.PreviewRequested+=Preview;pane.WorkflowRequested+=()=>OpenWorkflows();
+            pane.CopyLocationRequested+=CopySelectedLocation;pane.PasteLocationRequested+=PasteSelectedLocation;
         }
         exports.DefaultRequested+=()=>{if(exports.Folder is null){status.Text="Choose a single exports folder first.";return;}settings.DefaultExports=exports.Folder;SaveSettings();status.Text="Default exports folder saved.";};
         exports.ClearDefaultRequested+=()=>{settings.DefaultExports=null;SaveSettings();status.Text="Default exports folder cleared.";};
         inspector.HideRequested=ToggleInspector;inspector.Stage=Stage;inspector.DraftValue=DraftValue;inspector.SaveRequested=SaveEdits;inspector.RevertRequested=()=>{foreach(var p in SelectedPaths){drafts.Remove(p);locationDrafts.Remove(p);workflowDrafts.Remove(p);}inspector.RefreshFields();UpdatePending();};
         inspector.MapRequested += _ => OpenMapFromTransfer();
         PreviewKeyDown+=OnKey;
+        SizeChanged+=(_,_)=> { if(mode!=WorkspaceMode.Transfer) ConstrainMediaPane(); };
         Closing+=(_,e)=>
         {
             if(busy){MessageBox.Show(this,"An operation is still running. Use Cancel and wait for the current file to finish before closing.","Operation in progress");e.Cancel=true;return;}
             if(PendingPaths.Length>0&&!ConfirmDiscardChanges()){e.Cancel=true;return;}
             inspection?.Cancel();settings.Width=RestoreBounds.Width;settings.Height=RestoreBounds.Height;SaveSettings();
         };
-        SetMode(WorkspaceMode.Preview);UpdateControls();
+        SetMode(WorkspaceMode.Metadata);UpdateControls();
         Closed+=(_,_)=>mapPane?.Dispose();
         Loaded+=(_,_)=>
         {
@@ -75,7 +77,7 @@ public sealed partial class MainWindow : Window
             if(settings.DefaultExports is string folder&&Directory.Exists(folder))Receive(exports,[folder]);
         };
     }
-    private bool ConfirmDiscardChanges()
+    private bool ConfirmDiscardChanges(bool removing = false)
     {
         var dialog = UI.Window("Unsaved changes", 408, 224, this);
         dialog.SizeToContent = SizeToContent.Height;
@@ -85,7 +87,8 @@ public sealed partial class MainWindow : Window
         dialog.ThemeMode = ThemeMode;
         var content = new StackPanel { Margin = new Thickness(24, 20, 24, 18) };
         content.Children.Add(UI.Text("Discard unsaved changes?", 20, true));
-        var detail = UI.Text("Your pending metadata edits will be lost when you close Joonga Metadata.", 13);
+        var detail = UI.Text(removing ? "Pending edits for files you remove from the list will be discarded." :
+            "Your pending metadata edits will be lost when you close Joonga Metadata.", 13);
         detail.Margin = new Thickness(0, 8, 0, 20);
         content.Children.Add(detail);
 
@@ -111,6 +114,8 @@ public sealed partial class MainWindow : Window
     {
         addFiles=UI.IconButton("\uE710", "Add files", ChooseMedia, "Ctrl+O");
         folderCommands.Children.Add(addFiles);
+        clearFiles=UI.IconButton("\uE74D","Clear all files",ClearFiles);
+        folderCommands.Children.Add(clearFiles);
         folderCommands.Children.Add(UI.IconButton("\uE838", "Choose originals folder", () => Choose(originals), "Ctrl+O"));
         folderCommands.Children.Add(UI.IconButton("\uE8DE", "Choose exports folder", () => Choose(exports), "Ctrl+Shift+O"));
 
@@ -130,12 +135,15 @@ public sealed partial class MainWindow : Window
         UI.StyleIconButton(previewPaneButton, "\uE8FF", "Preview pane", "Ctrl+I");
         UpdatePreviewButton(true);
         previewPaneButton.Click += (_, _) => ToggleInspector();
+        mapFavourites=UI.IconButton("\uE734","Map favourites");
+        mapFavourites.Click+=(_,_)=>mapPane?.OpenFavourites(mapFavourites);
 
         var more = UI.IconButton("\uE712", "More actions");
         more.Click += (_, _) => ShowMoreActions(more);
         var left = UI.Horizontal(folderCommands, separator, workflows);
         var right = UI.Horizontal(
             UI.IconButton("\uE72C", "Refresh", Refresh, "F5"),
+            mapFavourites,
             previewPaneButton,
             UI.IconButton("\uE713", "Settings", ShowSettings, "Ctrl+,"),
             more);
@@ -156,6 +164,10 @@ public sealed partial class MainWindow : Window
     {
         var menu = new ContextMenu();
         if(mode!=WorkspaceMode.Transfer)AddAction(menu,"Add folder…",ChooseMediaFolder,!busy);
+        if(mode!=WorkspaceMode.Transfer)AddAction(menu,"Remove selected files",RemoveSelectedMedia,!busy&&mediaSelection.Count>0,"Delete");
+        AddAction(menu,"Clear all files",ClearFiles,clearFiles.IsEnabled);
+        AddAction(menu,"Copy location",CopySelectedLocation,!busy&&SelectedLocation() is not null,"Ctrl+Shift+C");
+        AddAction(menu,"Paste location",PasteSelectedLocation,!busy&&exif is not null&&SelectedPaths.Length>0,"Ctrl+Shift+V");
         AddAction(menu, "Quick preview", Preview, SelectedPaths.Length > 0, "Space");
         AddAction(menu, "Previous file", () => Navigate(-1), !busy && (mode!=WorkspaceMode.Transfer?mediaItems.Count>0:NavigationTarget(-1) is not null), "Ctrl+Alt+[");
         AddAction(menu, "Next file", () => Navigate(1), !busy && (mode!=WorkspaceMode.Transfer?mediaItems.Count>0:NavigationTarget(1) is not null), "Ctrl+Alt+]");
@@ -201,9 +213,9 @@ public sealed partial class MainWindow : Window
         }
         else if(modifiers.HasFlag(ModifierKeys.Control))
         {
-            if(mode==WorkspaceMode.Map&&mapPane is not null&&modifiers==(ModifierKeys.Control|ModifierKeys.Shift)&&e.Key is Key.C or Key.V)
+            if(modifiers==(ModifierKeys.Control|ModifierKeys.Shift)&&e.Key is Key.C or Key.V)
             {
-                if(e.Key==Key.C)mapPane.CopyLocation();else mapPane.PasteLocation();
+                if(e.Key==Key.C)CopySelectedLocation();else PasteSelectedLocation();
                 e.Handled=true;
             }
             else if(e.Key==Key.N){OpenWorkflows(true);e.Handled=true;}
@@ -215,11 +227,26 @@ public sealed partial class MainWindow : Window
         else if(e.Key==Key.F5){Refresh();e.Handled=true;}
     }
     private void SaveSettings(){if(isolated)return;try{settings.Save();}catch(Exception e){status.Text="Settings could not be saved: "+e.Message;}}
-    private void ChooseExif(Window owner)
+    private async Task ChooseExif(Window owner)
     {
         if(busy)return;var dialog=new OpenFileDialog{Title="Choose exiftool.exe",Filter="ExifTool executable (*.exe)|*.exe"};if(dialog.ShowDialog(owner)!=true)return;
         if(Path.GetFileName(dialog.FileName).Contains("(-k)",StringComparison.OrdinalIgnoreCase)){MessageBox.Show(this,"Rename exiftool(-k).exe to exiftool.exe first. Keep its exiftool_files folder beside it.","ExifTool setup");return;}
-        ApplyExifTool(dialog.FileName);
+        await ValidateExifTool(dialog.FileName);
+    }
+    private async Task ValidateExifTool(string requestedPath)
+    {
+        if(busy)return;
+        var executable=requestedPath.Trim().Trim('"');
+        if(!Path.IsPathFullyQualified(executable)||!File.Exists(executable)||
+            !Path.GetExtension(executable).Equals(".exe",StringComparison.OrdinalIgnoreCase))
+            throw new IOException("Enter the full path to an ExifTool executable.");
+        if(Path.GetFileName(executable).Contains("(-k)",StringComparison.OrdinalIgnoreCase))
+            throw new IOException("Rename exiftool(-k).exe to exiftool.exe first.");
+        using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var (exitCode,output)=await new ExifService(executable).RunAsync(["-ver"],timeout.Token);
+        if(exitCode!=0||!Version.TryParse(output.Trim(),out _))
+            throw new IOException("The executable did not report a valid ExifTool version.");
+        ApplyExifTool(executable);
     }
     private void ApplyExifTool(string? executable)
     {
@@ -240,10 +267,10 @@ public sealed partial class MainWindow : Window
     private void ShowSettings()
     {
         if (busy) return;
-        var dialog = new SettingsWindow(this, settings, () => exif?.Executable, ChooseExif,
+        var dialog = new SettingsWindow(this, settings, () => exif?.Executable, ChooseExif, ValidateExifTool,
             () => ApplyExifTool(null), SaveSettings, show =>
             {
-                if ((inspector.Visibility == Visibility.Visible) != show) ToggleInspector();
+                if (settings.ShowInspector != show) ToggleInspector();
                 SaveSettings();
             }, OpenWorkflowLibrary);
         dialog.ShowDialog();
@@ -303,7 +330,7 @@ public sealed partial class MainWindow : Window
         var version = ++inspectionVersion;
         var paths = SelectedPaths;
         var reader = exif;
-        if(mode==WorkspaceMode.Preview||mode==WorkspaceMode.Map) { inspection=null; return; }
+        if(mode==WorkspaceMode.Map) { inspection=null; return; }
         var thumbnail = inspector.SetSelection(paths,mode==WorkspaceMode.Metadata?"Files":active==originals?"Originals":"Exports");
         UpdatePending();
         try
@@ -413,12 +440,20 @@ public sealed partial class MainWindow : Window
     {
         if(busy)return;busy=true;operation=new();inspection?.Cancel();status.Text=message;progress.Visibility=Visibility.Visible;progress.IsIndeterminate=!determinate;progress.Value=0;cancel.Visibility=Visibility.Visible;UpdateControls();
         try{await action(operation.Token);}catch(OperationCanceledException){status.Text="Cancelled.";}catch(Exception e){status.Text=e.Message;UI.Results(this,"Operation failed",e.ToString());}
-        finally{busy=false;operation.Dispose();operation=null;progress.Visibility=Visibility.Collapsed;cancel.Visibility=Visibility.Collapsed;UpdateControls();Inspect();}
+        finally{busy=false;operation.Dispose();operation=null;progress.Visibility=Visibility.Collapsed;cancel.Visibility=Visibility.Collapsed;UpdateControls();UpdateMap();Inspect();}
     }
-    private void UpdateControls(){modePicker.IsEnabled=!busy;mediaWorkspace.IsEnabled=!busy;folderCommands.IsEnabled=!busy;originals.IsEnabled=!busy;exports.IsEnabled=!busy;inspector.SetBusy(busy);copy.IsEnabled=!busy&&exif is not null&&matches.Any(m=>m.Matched);selectionCount.Text=$"{SelectedPaths.Length} selected   ";UpdatePending();}
+    private void UpdateControls(){modePicker.IsEnabled=!busy;mediaWorkspace.IsEnabled=!busy;folderCommands.IsEnabled=!busy;originals.IsEnabled=!busy;exports.IsEnabled=!busy;inspector.SetBusy(busy);copy.IsEnabled=!busy&&exif is not null&&matches.Any(m=>m.Matched);clearFiles.IsEnabled=!busy&&(mode==WorkspaceMode.Transfer?originalFiles.Length+exportFiles.Length>0:mediaItems.Count>0);mapFavourites.IsEnabled=!busy;selectionCount.Text=$"{SelectedPaths.Length} selected   ";UpdatePending();}
     private void ToggleInspector()
     {
-        if(mode!=WorkspaceMode.Transfer)return;
+        if(busy)return;
+        if(mode!=WorkspaceMode.Transfer)
+        {
+            settings.ShowInspector=!settings.ShowInspector;
+            LayoutMediaPanes();
+            SaveSettings();
+            Inspect();
+            return;
+        }
         var show=inspector.Visibility!=Visibility.Visible;
         if(!show&&inspectorColumn.ActualWidth>=inspectorColumn.MinWidth)inspectorWidth=inspectorColumn.ActualWidth;
         inspector.Visibility=show?Visibility.Visible:Visibility.Collapsed;
@@ -427,6 +462,7 @@ public sealed partial class MainWindow : Window
         inspectorDivider.Width=new GridLength(show?5:0);
         settings.ShowInspector=show;
         UpdatePreviewButton(show);
+        SaveSettings();
     }
     private FileRow? NavigationTarget(int offset)
     {

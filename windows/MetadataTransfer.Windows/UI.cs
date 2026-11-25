@@ -79,10 +79,11 @@ internal static class UI
         var heading=Text(title,20,true);heading.Margin=new Thickness(0,0,0,16);DockPanel.SetDock(heading,Dock.Top);grid.Children.Add(heading);
         var box=Input("Operation details",content,true);box.IsReadOnly=true;box.FontFamily=new FontFamily("Cascadia Mono, Consolas");box.FontSize=12;grid.Children.Add(box);w.Content=grid;w.ShowDialog();
     }
+    public const double FileRowHeight = 46;
     public static DrawingBrush Stripes()
     {
-        var group=new DrawingGroup();group.Children.Add(new GeometryDrawing(Brushes.Transparent,null,new RectangleGeometry(new Rect(0,0,1,88))));
-        group.Children.Add(new GeometryDrawing((Brush)Application.Current.FindResource("WorkspaceStripeBrush"),null,new RectangleGeometry(new Rect(0,0,1,44))));
-        return new DrawingBrush(group){TileMode=TileMode.Tile,Viewport=new Rect(0,0,1,88),ViewportUnits=BrushMappingMode.Absolute,Stretch=Stretch.Fill};
+        var group=new DrawingGroup();group.Children.Add(new GeometryDrawing(Brushes.Transparent,null,new RectangleGeometry(new Rect(0,0,1,FileRowHeight*2))));
+        group.Children.Add(new GeometryDrawing((Brush)Application.Current.FindResource("WorkspaceStripeBrush"),null,new RectangleGeometry(new Rect(0,0,1,FileRowHeight))));
+        return new DrawingBrush(group){TileMode=TileMode.Tile,Viewport=new Rect(0,0,1,FileRowHeight*2),ViewportUnits=BrushMappingMode.Absolute,Stretch=Stretch.Fill};
     }
 }

@@ -10,7 +10,7 @@ internal sealed class SettingsWindow : Window
 {
     public SettingsWindow(
         Window owner, Settings settings, Func<string?> exifToolPath,
-        Action<Window> chooseExifTool, Action resetExifTool,
+        Func<Window,Task> chooseExifTool, Func<string,Task> applyExifTool, Action resetExifTool,
         Action save, Action<bool> togglePreview, Action openWorkflowLibrary)
     {
         Owner = owner;
@@ -86,17 +86,32 @@ internal sealed class SettingsWindow : Window
         AddSection("Workspace", UI.Muted("Default exports folder"), folderPath,
             UI.Horizontal(chooseFolder, openFolder, clearFolder), showPreview);
 
-        var exifPath = UI.Muted("");
+        var exifPath = UI.Input("Full path to ExifTool executable");
+        var toolStatus = UI.Muted("");
+        var chooseTool = UI.Button("Choose…", () => {});
+        var applyTool = UI.Button("Use this path", () => {});
+        var automaticTool = UI.Button("Use bundled ExifTool", () => { resetExifTool(); UpdateExifTool(); });
         void UpdateExifTool()
         {
-            exifPath.Text = exifToolPath() ?? "ExifTool is unavailable";
+            exifPath.Text = exifToolPath() ?? "";
             exifPath.ToolTip = exifToolPath();
         }
-        var chooseTool = UI.Button("Choose…", () => { chooseExifTool(this); UpdateExifTool(); });
-        var automaticTool = UI.Button("Use automatic detection", () => { resetExifTool(); UpdateExifTool(); });
+        async Task ChangeTool(Func<Task> change)
+        {
+            chooseTool.IsEnabled=applyTool.IsEnabled=automaticTool.IsEnabled=false;
+            toolStatus.Text="";
+            try { await change(); UpdateExifTool(); }
+            catch(Exception e) when(e is IOException or OperationCanceledException or System.ComponentModel.Win32Exception)
+            {
+                toolStatus.Text=e is OperationCanceledException?"ExifTool did not respond in time.":e.Message;
+            }
+            finally { chooseTool.IsEnabled=applyTool.IsEnabled=automaticTool.IsEnabled=true; }
+        }
+        chooseTool.Click+=async (_,_)=>await ChangeTool(()=>chooseExifTool(this));
+        applyTool.Click+=async (_,_)=>await ChangeTool(()=>applyExifTool(exifPath.Text));
         UpdateExifTool();
         AddSection("Tools and data", UI.Muted("ExifTool executable"), exifPath,
-            UI.Horizontal(chooseTool, automaticTool),
+            UI.Horizontal(chooseTool, applyTool, automaticTool), toolStatus,
             UI.Horizontal(UI.Button("Open Workflow Library Folder", openWorkflowLibrary)));
 
         layout.Children.Add(new ScrollViewer { Content = sections, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });

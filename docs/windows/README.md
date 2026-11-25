@@ -14,7 +14,7 @@ Windows 11 22H2 or later is the target. Windows can substitute a solid backgroun
 
 ## Compare and copy
 
-The title bar switches between Preview, Metadata, Map and Transfer. Add files in Preview, Metadata or Map. Choose originals and exports in Transfer. Hover over an icon to see its name and shortcut. Use **More actions** for previous and next file, Quick preview, saving edits, and reviewing the last operation.
+The title bar switches between Metadata, Map and Transfer. Metadata and Map share the file list and selection. Drag the divider to resize the file pane and press Ctrl+I to toggle the Metadata inspector. Right-click a column header to choose columns or reset to defaults. Drag headers to reorder them. Each workspace remembers its column layout. Use the toolbar trash icon to clear the current file list, or right-click a row and choose **Remove from list**. Use **More actions** for navigation, Quick preview, location commands and operation results.
 
 Choose folders or drop folders/individual files into either pane. A single folder replaces that pane; loose files or several folders append. Nested folders are scanned. Reparse-point subdirectories are skipped, and inaccessible folders report an error rather than silently pretending every file was scanned. Clear a pane from its folder menu.
 
@@ -33,7 +33,7 @@ Names match without extensions, case-insensitively. A trailing `-HDR` may match 
 - Add any other writable ExifTool tag with **Add another tag**.
 - Space or double-click opens Quick preview; Space/Escape closes it. Arrow keys navigate a multi-file selection. Video playback uses Windows codecs and provides Open externally when unsupported.
 - Right-click for preview, Open, Show in Explorer, Copy paths or Apply workflow.
-- **Map** plots all loaded files with saved or staged GPS. Select files in the left pane, then click the map or choose a search result to stage coordinates. Use **Copy location**, **Paste location**, **Favourites**, and **Selected only** to reuse or filter pins. Normal uses OpenStreetMap. Satellite and Hybrid use Esri imagery. Map tiles and Photon search require internet access and the map requires Edge WebView2. **Save changes** writes all staged files together.
+- **Map** plots saved and staged GPS and groups nearby photo pins with a count badge. Open a group to zoom in, select one file, or select every member. Select files before clicking a point or choosing a search result to stage coordinates. Use the toolbar **Favourites** button and the file context menu’s **Copy location** and **Paste location** commands (Ctrl+Shift+C/V) to reuse locations. Use **Map options** to fit or filter pins and switch between Normal (OpenStreetMap), Hybrid and Satellite (Esri). Tiles and Photon search require internet access and the map requires Edge WebView2. **Save changes** writes staged edits across modes.
 
 Shell thumbnails use Windows' installed codecs. AVIF/HEIF/RAW and less common video formats may need Windows codec extensions to display thumbnails or play in the preview; this does not prevent ExifTool from reading/writing supported metadata.
 

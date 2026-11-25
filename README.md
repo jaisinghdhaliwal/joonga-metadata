@@ -20,12 +20,11 @@ Get the latest builds from [GitHub Releases](https://github.com/jaisinghdhaliwal
 
 ## Features
 
-- **Preview** sorts photos and videos by filename, tag count, camera, date, or GPS.
-- **Metadata** groups tags for editing and applies reusable workflows to selected files. Both apps use ExifTool and share a portable workflow format.
+- **Metadata** sorts photos and videos, previews the selection in a collapsible inspector, groups tags for editing, and applies reusable workflows. Both apps use ExifTool and share a portable workflow format.
 - **Map** plots saved and pending GPS coordinates. Search for a place, pick a point, or reuse a favourite or copied location. Switch between Normal, Hybrid, and Satellite views or show only selected files.
 - **Transfer** matches originals to exports and copies writable metadata, including across file extensions and HDR filename variants.
 
-Preview, Metadata, and Map share the same file list and selection. Manual edits, workflow assignments, and map changes stay pending across files and modes until you choose **Save Changes**. ExifTool keeps backups when writing files.
+Metadata and Map share a resizable file pane and selection, with separate column layouts. Manual edits, workflow assignments, and map changes stay pending across files and modes until you choose **Save Changes**. ExifTool keeps backups when writing files.
 
 ## How it works
 

@@ -37,6 +37,7 @@ const photoElements = new Map();
 const photoCache = new Map();
 const waiting = new Set();
 const inFlight = new Set();
+let locations = [];
 
 function requestPhotos() {
     for (const id of waiting) {
@@ -68,26 +69,88 @@ function showPhoto(tile, image) {
     tile.replaceChildren(photo);
 }
 
-function addPhotoPin(file) {
+function addPhotoPin(group) {
+    const file = group.find(item => item.selected) ?? group[0];
     const tile = document.createElement("div");
     tile.className = "photo-pin-tile";
     tile.dataset.fileId = file.id;
     tile.textContent = "▧";
 
-    const size = file.selected ? 48 : 44;
-    const style = "photo-pin" + (file.pending ? " photo-pin-pending" : "");
-    const icon = L.divIcon({ html: tile, className: style, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
+    const stack = document.createElement("div");
+    stack.className = "photo-pin-stack";
+    stack.append(tile);
+    if (group.length > 1) {
+        const count = document.createElement("span");
+        count.className = "photo-pin-count";
+        count.textContent = group.length;
+        stack.append(count);
+    }
+    const size = file.selected || group.length > 1 ? 48 : 44;
+    const style = "photo-pin" + (group.some(item => item.pending) ? " photo-pin-pending" : "");
+    const icon = L.divIcon({ html: stack, className: style, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
+    const title = group.length > 1 ? group.length + " files at nearby locations" : file.name + (file.pending ? " · Pending location" : "");
     L.marker([file.latitude, file.longitude], {
-        icon, title: file.name + (file.pending ? " · Pending location" : ""),
+        icon, title, alt: title,
         zIndexOffset: file.selected ? 1000 : 0, bubblingMouseEvents: false
-    }).on("click", () => webview.postMessage({ kind: "file", id: file.id })).addTo(files);
+    }).on("click", event => {
+        if (group.length === 1) {
+            webview.postMessage({ kind: "file", id: file.id });
+            return;
+        }
+        const list = document.createElement("div");
+        list.className = "photo-cluster-files";
+        const select = document.createElement("button");
+        select.textContent = "Select all " + group.length + " files";
+        select.onclick = () => {
+            map.closePopup();
+            webview.postMessage({ kind: "cluster", ids: group.map(item => item.id) });
+        };
+        list.append(select);
+        if (map.getZoom() < 19) {
+            const zoom = document.createElement("button");
+            zoom.textContent = "Zoom into this group";
+            zoom.onclick = () => {
+                map.closePopup();
+                map.fitBounds(group.map(item => [item.latitude, item.longitude]), {
+                    maxZoom: Math.min(19, map.getZoom() + 3), padding: [48, 48]
+                });
+            };
+            list.append(zoom);
+        }
+        for (const item of group) {
+            const button = document.createElement("button");
+            button.textContent = item.name;
+            button.title = item.id;
+            button.onclick = () => {
+                map.closePopup();
+                webview.postMessage({ kind: "file", id: item.id });
+            };
+            list.append(button);
+        }
+        L.popup().setLatLng(event.latlng).setContent(list).openOn(map);
+    }).addTo(files);
     photoElements.set(file.id, tile);
     if (photoCache.has(file.id)) showPhoto(tile, photoCache.get(file.id));
     else visiblePhotos.observe(tile);
 }
 
+function renderPins() {
+    visiblePhotos.disconnect();
+    waiting.clear();
+    photoElements.clear();
+    files.clearLayers();
+    const groups = new Map();
+    for (const file of locations) {
+        const pixel = map.project([file.latitude, file.longitude]);
+        const cell = Math.floor(pixel.x / 58) + ":" + Math.floor(pixel.y / 58);
+        if (!groups.has(cell)) groups.set(cell, []);
+        groups.get(cell).push(file);
+    }
+    for (const group of groups.values()) addPhotoPin(group);
+}
+
 function fitFiles() {
-    const points = files.getLayers().map(layer => layer.getLatLng());
+    const points = locations.map(file => [file.latitude, file.longitude]);
     if (points.length > 0) map.fitBounds(points, { maxZoom: 15, padding: [48, 48], animate: false });
 }
 
@@ -97,14 +160,12 @@ function pick(point) {
 }
 
 map.on("click", event => pick(event.latlng));
+map.on("zoomend", renderPins);
 webview.addEventListener("message", ({ data }) => {
     if (data.kind === "files") {
-        visiblePhotos.disconnect();
-        waiting.clear();
-        photoElements.clear();
-        files.clearLayers();
-        for (const file of data.locations) addPhotoPin(file);
+        locations = data.locations;
         if (data.fit) fitFiles();
+        renderPins();
     } else if (data.kind === "thumbnail") {
         inFlight.delete(data.id);
         photoCache.set(data.id, data.image);

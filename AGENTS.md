@@ -88,7 +88,7 @@ All modes share loaded files and selection where the platform permits.
 
 | Mode | Purpose |
 | --- | --- |
-| Metadata | Browse, sort, and edit categorized metadata using the shared file pane and a collapsible right inspector sidebar (Preview merged into Metadata on macOS). |
+| Metadata | Browse, sort, and edit categorized metadata using the shared file pane and a collapsible right inspector sidebar. |
 | Map | Plot saved/pending GPS data with grouped cluster counts, search/click a place, stage coordinates, copy/paste locations and manage favourites using the shared file pane. |
 | Transfer | Match originals to exports and copy writable metadata to matching export files. |
 
@@ -201,6 +201,25 @@ inspired by Apple Photos.
 | Windows ARM64 | `.\\windows\\Build.ps1 -Runtime win-arm64` | Same core checks; confirm native visual/runtime behaviour on ARM hardware. |
 
 ### Current state (2026-11-25)
+
+- Functional parity across platforms is a product requirement. Use the
+  platform's native UI conventions for equivalent controls and compare both
+  implementations during feature work.
+- Windows now shares the Metadata/Map file grid and selection, retains its
+  WebView2 map between modes, and has a resizable shared pane, collapsible
+  thumbnail inspector, reorderable per-mode column sets, file removal and
+  clear actions. Batches of 60 show progressive file metadata and GPS reads.
+  Map options and toolbar favourites complement location commands in file
+  context menus and Ctrl+Shift+C/V. Nearby photo pins group with count badges
+  and support zooming and individual or group selection. ExifTool Settings
+  validates a typed or chosen custom path and can restore the bundled tool.
+- Windows parity changes were cross-built on macOS with .NET 10. The core
+  regression runner passed 42 checks with ExifTool, including partial batch
+  reads of JPEG and MP4 GPS data. A headless Chromium test with a simulated
+  WebView2 bridge exercised clustered pins, zoom, file selection and map
+  clicks. Native Windows testing of the splitter, Mica, Shell thumbnails and
+  WebView2 is still open. The native smoke test now covers Metadata loading,
+  inspector collapse and file removal.
 
 - `macos/build.command` bundles pinned ExifTool 13.64 into
   `Contents/Resources/exiftool/` and compiles the newest valid

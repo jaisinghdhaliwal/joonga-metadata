@@ -24,9 +24,12 @@ internal static class SmokeTest
             }
             await main.LoadSmokeAsync(originals,exports);await main.Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);Capture(main,"workspace.png");
             main.ThemeMode=ThemeMode.Light;main.UpdateLayout();Capture(main,"workspace-light.png");main.ThemeMode=ThemeMode.Dark;main.UpdateLayout();Capture(main,"workspace-dark.png");
+            await main.CheckMediaWorkspaceAsync(originals);
+            await main.Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);
+            Capture(main,"metadata.png");
             var store=new WorkflowStore(Path.Combine(temp,"Workflows.json"));store.Save([new("test","Camera details","My Workflows",["-Make=Sony","-Model=ILCE-7C"])]);
             var workflows=new WorkflowWindow(main,store,new(){{"Selected files",Directory.GetFiles(exports)}},true);workflows.Show();await workflows.Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);Capture(workflows,"workflows.png");workflows.Close();
-            File.WriteAllText(Path.Combine(Output,"passed.txt"),"Native Windows window startup, Fluent light/dark layout, synthetic media comparison, batch inspector and workflow window rendered. Mica composition, input interaction, codecs and map integration still require manual QA.");
+            File.WriteAllText(Path.Combine(Output,"passed.txt"),"Native Windows window startup, Fluent light/dark layout, synthetic media comparison, shared media table, collapsible inspector, file removal and workflow window rendered. Mica composition, splitter interaction, codecs and WebView2 integration still require manual QA.");
             Application.Current.Shutdown(0);
         }
         catch(Exception e){Failure(e);Application.Current.Shutdown(1);}

@@ -17,6 +17,11 @@ public sealed class ExifService
     }
     public async Task<(int ExitCode,string Output)> RunAsync(IEnumerable<string> args, CancellationToken cancel = default)
     {
+        var (code, output, error) = await RunProcessAsync(args, cancel);
+        return (code, output + (error.Length > 0 ? "\n" + error : ""));
+    }
+    private async Task<(int ExitCode,string Output,string Error)> RunProcessAsync(IEnumerable<string> args, CancellationToken cancel)
+    {
         await slots.WaitAsync(cancel);
         try
         {
@@ -28,20 +33,65 @@ public sealed class ExifService
             await process.WaitForExitAsync();
             var output = await stdout; var error = await stderr;
             cancel.ThrowIfCancellationRequested();
-            return (process.ExitCode, output + (error.Length > 0 ? "\n" + error : ""));
+            return (process.ExitCode, output, error);
         }
         finally { slots.Release(); }
     }
     public async Task<Dictionary<string,string>> ReadAsync(string path, CancellationToken cancel = default)
     {
-        var (code, output) = await RunAsync(["-j","-G1","-s",Path.GetFullPath(path)],cancel);
-        if (code != 0) throw new IOException(Path.GetFileName(path) + ": " + output);
+        var (code, output, error) = await RunProcessAsync(["-j","-G1","-s",Path.GetFullPath(path)],cancel);
+        if (code != 0) throw new IOException(Path.GetFileName(path) + ": " + output + error);
         using var doc = JsonDocument.Parse(output);
         return doc.RootElement[0].EnumerateObject().ToDictionary(p=>p.Name,p=>p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString() ?? "" : p.Value.ToString());
     }
+
+    public async Task<Dictionary<string, (Dictionary<string,string> Tags, GeoPoint? Location)>> ReadWorkspaceBatchAsync(
+        IReadOnlyList<string> paths, CancellationToken cancel)
+    {
+        // An argument file avoids Windows' command-line length limit for long Unicode paths.
+        var argumentFile = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllLinesAsync(argumentFile, paths.Select(Path.GetFullPath), cancel);
+            var (_, output, error) = await RunProcessAsync(
+                ["-charset", "filename=UTF8", "-j", "-G1", "-s", "-c", "%+.8f", "-@", argumentFile], cancel);
+            if (string.IsNullOrWhiteSpace(output)) throw new IOException(error);
+            using var document = JsonDocument.Parse(output);
+            var result = new Dictionary<string, (Dictionary<string,string>, GeoPoint?)>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in document.RootElement.EnumerateArray())
+            {
+                if (!item.TryGetProperty("SourceFile", out var source) || source.GetString() is not string file ||
+                    item.TryGetProperty("ExifTool:Error", out _) || item.TryGetProperty("Error", out _)) continue;
+                var path = Path.GetFullPath(file);
+                var tags = item.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.ToString());
+                result[path] = (tags, WorkspaceLocation(path, tags));
+            }
+            return result;
+        }
+        finally { File.Delete(argumentFile); }
+    }
+
+    private static GeoPoint? WorkspaceLocation(string path, Dictionary<string,string> tags)
+    {
+        static bool Number(string? value, out double number) =>
+            double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out number);
+        static double Signed(double number, string? reference, char negative) =>
+            reference?.StartsWith(negative.ToString(), StringComparison.OrdinalIgnoreCase) == true ? -Math.Abs(number) : number;
+
+        if (!Number(tags.GetValueOrDefault("Composite:GPSLatitude"), out var latitude) ||
+            !Number(tags.GetValueOrDefault("Composite:GPSLongitude"), out var longitude))
+        {
+            if (!Number(tags.GetValueOrDefault("GPS:GPSLatitude"), out latitude) ||
+                !Number(tags.GetValueOrDefault("GPS:GPSLongitude"), out longitude))
+                return null;
+            latitude = Signed(latitude, tags.GetValueOrDefault("GPS:GPSLatitudeRef"), 'S');
+            longitude = Signed(longitude, tags.GetValueOrDefault("GPS:GPSLongitudeRef"), 'W');
+        }
+        return latitude is >= -90 and <= 90 && longitude is >= -180 and <= 180 ? new(path, latitude, longitude) : null;
+    }
     public async Task<GeoPoint?> LocationAsync(string path, CancellationToken cancel = default)
     {
-        var (code, output) = await RunAsync(["-j","-n","-GPSLatitude","-GPSLongitude",Path.GetFullPath(path)],cancel);
+        var (code, output, _) = await RunProcessAsync(["-j","-n","-GPSLatitude","-GPSLongitude",Path.GetFullPath(path)],cancel);
         if(code != 0) return null;
         using var doc = JsonDocument.Parse(output);
         var item = doc.RootElement[0];
