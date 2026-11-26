@@ -130,9 +130,10 @@ inspired by Apple Photos.
 | `macos/` | Native SwiftUI/AppKit app, bundle metadata, icon sources and build script. |
 | `macos/Sources/` | macOS UI, metadata reading/writing, workflows, file actions, map/location and Quick Look. |
 | `windows/MetadataTransfer.Core/` | Platform-neutral models, matching, ExifTool integration and workflow persistence. |
-| `windows/MetadataTransfer.Windows/` | .NET 10 WPF UI, Mica/Fluent setup, panes, inspector, map, preview, settings and workflows. |
+| `windows/MetadataTransfer.Windows/` | .NET 10 WPF UI, Mica/Fluent setup, integrated uninstaller (`--uninstall`), panes, inspector, map, preview, settings and workflows. |
+| `windows/MetadataTransfer.Installer/` | Single-file self-contained .NET 10 WPF Windows 11 Fluent Setup wizard (`Joonga Metadata Setup.exe`). |
 | `windows/MetadataTransfer.Tests/` | Dependency-free regression runner and synthetic fixtures. |
-| `windows/Build.ps1` | Windows restore, pinned ExifTool verification, self-contained publish, test and ZIP build. |
+| `windows/Build.ps1` | Windows restore, pinned ExifTool verification, self-contained publish, test, portable ZIP and single-file `Setup.exe` build. |
 | `assets/` | Icon previews, SVGs and Icon Composer artwork. |
 | `docs/` | Platform setup, QA/validation and third-party notices. |
 | `.github/workflows/` | macOS and Windows build/test CI. |
@@ -168,7 +169,20 @@ inspired by Apple Photos.
 - UI coordination: `App.xaml(.cs)`, `MainWindow.cs` and
   `WorkspaceModes.cs`. Key features: `FilePane.cs`, `Inspector.cs`,
   `MapPane.cs`, `WindowHeader.cs`, `SettingsWindow.cs`,
-  `WorkflowWindow.cs` and `WorkspaceStyles.xaml`.
+  `WorkflowWindow.cs`, `UninstallWindow.cs` and `WorkspaceStyles.xaml`.
+- Installer (`windows/MetadataTransfer.Installer/`): embeds `Payload.zip` as a
+  managed resource inside a single-file `Joonga Metadata Setup.exe`, supports
+  all-users (`Program Files\Joonga Metadata`), current-user
+  (`%LocalAppData%\Programs\Joonga Metadata`), or custom folder selection, UAC
+  self-elevation, Start Menu/Desktop `.lnk` shortcuts via COM `IShellLinkW`,
+  `HKLM`/`HKCU` Apps & Features uninstall registration, `--install --quiet`
+  automation, and `--smoke-test`. The main app handles `--uninstall` (and
+  `--uninstall --quiet`) in `UninstallWindow.cs` with optional user-data
+  removal (`%APPDATA%\Metadata Transfer` and `%LOCALAPPDATA%\Metadata Transfer`)
+  and detached `cmd.exe` directory cleanup.
+- `ExifService` uses UTF-8 argument files (`-charset filename=UTF8 -@`) for
+  read, location, write, copy, and workspace batch invocations so non-ASCII
+  Windows paths work reliably.
 - Microsoft WebView2 is required only for the in-app map. Normal maps use
   OpenStreetMap; satellite/hybrid use Esri; place search uses Photon.
 - Preserve Mica/Fluent fallback when transparency is disabled.
@@ -200,7 +214,31 @@ inspired by Apple Photos.
 | Windows x64 | `.\\windows\\Build.ps1 -Runtime win-x64` | Build verifies ExifTool, publishes self-contained app and runs core tests. |
 | Windows ARM64 | `.\\windows\\Build.ps1 -Runtime win-arm64` | Same core checks; confirm native visual/runtime behaviour on ARM hardware. |
 
-### Current state (2026-11-25)
+### Current state (2026-11-26)
+
+- Added the Windows 11 Fluent installer (`windows/MetadataTransfer.Installer/`)
+  and integrated Fluent uninstaller (`UninstallWindow.cs`, `--uninstall`).
+  `windows/Build.ps1` now produces both the portable ZIP and a self-contained
+  single-file `Setup.exe` for `win-x64` and `win-arm64`.
+- Fixed a pre-existing Windows Unicode-path failure in `ExifService.cs` by
+  switching `ReadAsync`, `LocationAsync`, `WriteAsync`, and `CopyAsync` to
+  UTF-8 argument files (`-charset filename=UTF8 -@`) with UTF-8 stdio
+  decoding, matching `ReadWorkspaceBatchAsync`.
+- Verified `0.9.2` (commit `5ff3bf2d3a866d7b1584e3187971bd86471e8816`):
+  - macOS: `bash macos/build.command` succeeded (`AppIcon 9.icon` compiled to
+    `Assets.car`, ExifTool `13.64` bundled, `lipo -archs` confirmed
+    `x86_64` + `arm64`, strict `codesign` passed, `CFBundleShortVersionString`
+    `0.9.2`), and GitHub Actions `macOS build` passed (run `45746628234`).
+  - Windows: GitHub Actions `Windows build and tests` passed for both
+    `win-x64` and `win-arm64` (run `45746628207`), including
+    `MetadataTransfer.Tests`, native app `--smoke-test`, installer
+    `--smoke-test` (`installer-light.png` / `installer-dark.png`; light UI
+    renders cleanly with a minor vertical scrollbar in the 540px window), and
+    end-to-end silent install (`--quiet --install`), Start Menu shortcut /
+    `HKCU` uninstall registry verification, and silent uninstall
+    (`--uninstall --quiet`). Interactive UAC/all-users `Program Files`
+    install, Mica composition on desktop, and manual Windows 11 / macOS GUI
+    QA remain open.
 
 - macOS uses compact list/map thumbnails and a separate larger inspector
   preview cache, with decoded-byte and count limits. Duplicate Quick Look
@@ -323,37 +361,44 @@ no separate login, use the existing Git credential helper to supply
 Read access to the current release and repository push permission were
 verified with this setup on 2026-11-25.
 
-Current public version: **0.9.1** (`v0.9.1`, commit
-`81037b8d4c876f25986f959f00d469168e2bdf1e`). The release page is:
-<https://github.com/jaisinghdhaliwal/joonga-metadata/releases/tag/v0.9.1>
+Current public version: **0.9.2** (`v0.9.2`, commit
+`5ff3bf2d3a866d7b1584e3187971bd86471e8816`). The release page is:
+<https://github.com/jaisinghdhaliwal/joonga-metadata/releases/tag/v0.9.2>
 
 Published assets for that release (all built from commit
-`81037b8d4c876f25986f959f00d469168e2bdf1e`):
+`5ff3bf2d3a866d7b1584e3187971bd86471e8816`):
 
-- `Joonga-Metadata-0.9.1-macOS.dmg`: universal (`arm64` + `x86_64`)
+- `Joonga-Metadata-0.9.2-Windows-x64-Setup.exe`: self-contained Windows 11
+  x64 Fluent Setup wizard from CI run `45746628207` (installer `--smoke-test`
+  and silent install/uninstall verification passed on CI).
+- `Joonga-Metadata-0.9.2-Windows-arm64-Setup.exe`: self-contained Windows 11
+  ARM64 Fluent Setup wizard from CI run `45746628207`.
+- `Joonga-Metadata-0.9.2-Windows-x64.zip`: self-contained Windows 11 x64
+  portable build from CI run `45746628207` (core tests + `--smoke-test` UI
+  check passed on CI).
+- `Joonga-Metadata-0.9.2-Windows-arm64.zip`: self-contained Windows 11 ARM64
+  portable build from CI run `45746628207` (core tests passed on CI).
+- `Joonga-Metadata-0.9.2-macOS.dmg`: universal (`arm64` + `x86_64`)
   drag-to-install DMG containing `Joonga Metadata.app` plus an Applications
   shortcut.
-- `Joonga-Metadata-0.9.1-macOS.zip`: universal (`arm64` + `x86_64`) portable
+- `Joonga-Metadata-0.9.2-macOS.zip`: universal (`arm64` + `x86_64`) portable
   app bundle archive.
-- `Joonga-Metadata-0.9.1-Windows-x64.zip`: self-contained Windows 11 x64
-  portable build from CI run `45657484866` (core tests + `--smoke-test` UI
-  check passed on CI).
-- `Joonga-Metadata-0.9.1-Windows-arm64.zip`: self-contained Windows 11 ARM64
-  portable build from CI run `45657484866` (core tests passed on CI).
 - `SHA256SUMS.txt`: SHA-256 checksums for all release archives.
 
-Validation status for `v0.9.1`: macOS `bash macos/build.command`, `Assets.car`,
+Validation status for `v0.9.2`: macOS `bash macos/build.command`, `Assets.car`,
 bundled ExifTool `13.64`, `lipo -archs` (`x86_64` + `arm64`), strict
-`codesign`, `CFBundleShortVersionString` `0.9.1`, DMG mount/contents check via
-`diskutil image attach`, and `shasum -a 256 -c SHA256SUMS.txt` all passed, along
-with macOS (`45657484917`) and Windows (`45657484866`) CI workflows. Interactive
-macOS GUI visual QA and manual Windows 11 QA (including Windows installer
-EXEs, which were not built on macOS) remain open.
+`codesign`, `CFBundleShortVersionString` `0.9.2`, DMG mount/contents/codesign
+check via `hdiutil attach`, and `shasum -a 256 -c SHA256SUMS.txt` all passed,
+along with macOS (`45746628234`) and Windows (`45746628207`) CI workflows.
+Interactive macOS GUI visual QA and manual Windows 11 desktop QA (including
+interactive UAC `Program Files` install/uninstall, Mica, Shell thumbnails,
+and WebView2) remain open.
 
-The repository CI produces portable ZIP artifacts. It does not yet contain a
-fully reproducible DMG/setup-installer release pipeline. macOS artifacts are
-ad-hoc signed and not notarized; Windows artifacts are not Authenticode-signed.
-Do not describe either as signed, notarized or reputation-clean.
+The repository CI produces portable Windows ZIPs, Windows `Setup.exe`
+installers, and the macOS portable ZIP; DMG packaging and GitHub Release
+creation remain manual. macOS artifacts are ad-hoc signed and not notarized;
+Windows artifacts are not Authenticode-signed. Do not describe either as
+signed, notarized or reputation-clean.
 
 ## Release checklist
 
