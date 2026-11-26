@@ -490,7 +490,7 @@ internal sealed class UninstallWindow : Window
         IShellLinkW? link = null;
         try
         {
-            link = (IShellLinkW)new ShellLink();
+            link = (IShellLinkW)(object)new ShellLink();
             ((IPersistFile)link).Load(shortcutPath, 0);
             var sb = new StringBuilder(1024);
             link.GetPath(sb, sb.Capacity, IntPtr.Zero, 0);

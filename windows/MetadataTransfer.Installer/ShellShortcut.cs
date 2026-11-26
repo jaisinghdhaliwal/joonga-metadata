@@ -22,7 +22,7 @@ internal static class ShellShortcut
         IShellLinkW? link = null;
         try
         {
-            link = (IShellLinkW)new ShellLink();
+            link = (IShellLinkW)(object)new ShellLink();
             link.SetPath(targetPath);
             link.SetWorkingDirectory(workingDirectory);
             link.SetDescription(description);
