@@ -1,11 +1,13 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Text;
 using System.Text.Json;
 
 namespace MetadataTransfer.Core;
 
 public sealed class ExifService
 {
+    private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
     public string Executable { get; }
     private readonly SemaphoreSlim slots = new(4);
     public ExifService(string executable) { Executable = executable; }
@@ -25,7 +27,18 @@ public sealed class ExifService
         await slots.WaitAsync(cancel);
         try
         {
-            using var process = new Process { StartInfo = new ProcessStartInfo(Executable) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true } };
+            using var process = new Process
+            {
+                StartInfo = new ProcessStartInfo(Executable)
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
+                }
+            };
             foreach (var arg in args) process.StartInfo.ArgumentList.Add(arg);
             process.Start();
             var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
@@ -37,9 +50,22 @@ public sealed class ExifService
         }
         finally { slots.Release(); }
     }
+    private async Task<(int ExitCode,string Output,string Error)> RunWithUtf8ArgsAsync(IEnumerable<string> args, CancellationToken cancel = default)
+    {
+        var argumentFile = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllLinesAsync(argumentFile, args, Utf8NoBom, cancel);
+            return await RunProcessAsync(["-charset", "filename=UTF8", "-@", argumentFile], cancel);
+        }
+        finally
+        {
+            try { File.Delete(argumentFile); } catch (IOException) { }
+        }
+    }
     public async Task<Dictionary<string,string>> ReadAsync(string path, CancellationToken cancel = default)
     {
-        var (code, output, error) = await RunProcessAsync(["-j","-G1","-s",Path.GetFullPath(path)],cancel);
+        var (code, output, error) = await RunWithUtf8ArgsAsync(["-j","-G1","-s",Path.GetFullPath(path)],cancel);
         if (code != 0) throw new IOException(Path.GetFileName(path) + ": " + output + error);
         using var doc = JsonDocument.Parse(output);
         return doc.RootElement[0].EnumerateObject().ToDictionary(p=>p.Name,p=>p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString() ?? "" : p.Value.ToString());
@@ -52,7 +78,7 @@ public sealed class ExifService
         var argumentFile = Path.GetTempFileName();
         try
         {
-            await File.WriteAllLinesAsync(argumentFile, paths.Select(Path.GetFullPath), cancel);
+            await File.WriteAllLinesAsync(argumentFile, paths.Select(Path.GetFullPath), Utf8NoBom, cancel);
             var (_, output, error) = await RunProcessAsync(
                 ["-charset", "filename=UTF8", "-j", "-G1", "-s", "-c", "%+.8f", "-@", argumentFile], cancel);
             if (string.IsNullOrWhiteSpace(output)) throw new IOException(error);
@@ -91,7 +117,7 @@ public sealed class ExifService
     }
     public async Task<GeoPoint?> LocationAsync(string path, CancellationToken cancel = default)
     {
-        var (code, output, _) = await RunProcessAsync(["-j","-n","-GPSLatitude","-GPSLongitude",Path.GetFullPath(path)],cancel);
+        var (code, output, _) = await RunWithUtf8ArgsAsync(["-j","-n","-GPSLatitude","-GPSLongitude",Path.GetFullPath(path)],cancel);
         if(code != 0) return null;
         using var doc = JsonDocument.Parse(output);
         var item = doc.RootElement[0];
@@ -147,7 +173,8 @@ public sealed class ExifService
                 foreach(var key in existing.Keys.Where(k=> k.Contains(':') && k.Split(':').Last().Equals(tag,StringComparison.OrdinalIgnoreCase) && new[]{"IFD0","XMP-tiff","Keys","UserData","ItemList"}.Contains(k.Split(':')[0]))) args.Add($"-{key}={value}");
             }
         }
-        var (code, output) = await RunAsync(new[]{"-P"}.Concat(args).Append(Path.GetFullPath(path)));
+        var (code, stdout, stderr) = await RunWithUtf8ArgsAsync(new[]{"-P"}.Concat(args).Append(Path.GetFullPath(path)));
+        var output = stdout + (stderr.Length > 0 ? "\n" + stderr : "");
         var success = code == 0 && !output.Contains("Warning:") && !output.Contains("Error:");
         if(success && expected.Count > 0)
         {
@@ -164,7 +191,8 @@ public sealed class ExifService
     public async Task<OperationResult> CopyAsync(Match pair)
     {
         if(!pair.Matched || string.Equals(Matching.CanonicalPath(pair.Original!),Matching.CanonicalPath(pair.Export!),StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("This pair cannot be copied safely.");
-        var (code,output) = await RunAsync(["-P","-TagsFromFile",Path.GetFullPath(pair.Original!),"-all:all",Path.GetFullPath(pair.Export!)]);
+        var (code, stdout, stderr) = await RunWithUtf8ArgsAsync(["-P","-TagsFromFile",Path.GetFullPath(pair.Original!),"-all:all",Path.GetFullPath(pair.Export!)]);
+        var output = stdout + (stderr.Length > 0 ? "\n" + stderr : "");
         return new(pair.Export!,code == 0 && !output.Contains("Warning:") && !output.Contains("Error:"),output);
     }
 }
