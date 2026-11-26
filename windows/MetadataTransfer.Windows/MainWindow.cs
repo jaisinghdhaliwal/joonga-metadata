@@ -91,7 +91,7 @@ public sealed partial class MainWindow : Window
         var content = new StackPanel { Margin = new Thickness(24, 20, 24, 18) };
         content.Children.Add(UI.Text("Discard unsaved changes?", 20, true));
         var detail = UI.Text(removing ? "Pending edits for files you remove from the list will be discarded." :
-            "Your pending metadata edits will be lost when you close Joonga Metadata.", 13);
+            "Your pending metadata edits will be lost when you close Joonga Tag.", 13);
         detail.Margin = new Thickness(0, 8, 0, 20);
         content.Children.Add(detail);
 

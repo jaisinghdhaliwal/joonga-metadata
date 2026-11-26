@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleExecutable</key>
-	<string>Joonga Metadata</string>
+	<string>Joonga Tag</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>local.codex.metadatapreview</string>
+	<string>com.jaisinghdhaliwal.joongatag</string>
 	<key>CFBundleName</key>
-	<string>Joonga Metadata</string>
+	<string>Joonga Tag</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -19,6 +19,6 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>
 	<key>CFBundleDisplayName</key>
-	<string>Joonga Metadata</string>
+	<string>Joonga Tag</string>
 </dict>
 </plist>

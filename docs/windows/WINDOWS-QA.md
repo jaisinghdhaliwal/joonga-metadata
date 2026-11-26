@@ -2,7 +2,7 @@
 
 Cross-compilation and engine tests have run on macOS. The following checks are provided for a Windows 11 machine; they are not marked passed without executing them there.
 
-1. Extract a release ZIP, run `Joonga Metadata.exe --smoke-test` from PowerShell and inspect `SmokeResults`. Exit code must be 0. Screenshots capture WPF content, not the compositor's Mica effect.
+1. Extract a release ZIP, run `Joonga Tag.exe --smoke-test` from PowerShell and inspect `SmokeResults`. Exit code must be 0. Screenshots capture WPF content, not the compositor's Mica effect.
 2. Launch normally in light/dark/high-contrast themes. Check Mica with transparency enabled, native snap layouts, focused/unfocused states, 100/150/200% DPI, minimum window size, and moving between monitors.
 3. Drop a source folder and export folder. Try nested folders, -HDR exports, ambiguous stems, Unicode/long paths, loose files and mixed image/video formats. Confirm green match markers, continuing alternating stripes, and that the drop outline clears when you leave a pane. Clear one pane and check its Choose Folder action.
 4. Ctrl/Shift-select files. Check one Make/Model field, orange mixed values, editable missing fields and no imported-original values masquerading as selected-file values. Save changes on disposable copies; inspect ExifTool output and retained backups.

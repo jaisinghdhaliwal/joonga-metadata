@@ -11,13 +11,14 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shell;
 using Microsoft.Win32;
+using MetadataTransfer.Core;
 
 namespace MetadataTransfer.Windows;
 
 internal sealed class UninstallWindow : Window
 {
-    private const string UninstallSubkey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\JoongaMetadata";
-    private const string ShortcutFileName = "Joonga Metadata.lnk";
+    private const string UninstallSubkey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\JoongaTag";
+    private const string ShortcutFileName = "Joonga Tag.lnk";
 
     private readonly string installDir;
     private readonly CheckBox removeUserData;
@@ -58,7 +59,7 @@ internal sealed class UninstallWindow : Window
         });
         var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         titles.Children.Add(UI.Text($"Uninstall {App.ProductName}", 20, true));
-        titles.Children.Add(UI.Muted("Remove Joonga Metadata and its shortcuts from this PC", 12));
+        titles.Children.Add(UI.Muted("Remove Joonga Tag and its shortcuts from this PC", 12));
         header.Children.Add(titles);
         DockPanel.SetDock(header, Dock.Top);
         body.Children.Add(header);
@@ -161,7 +162,7 @@ internal sealed class UninstallWindow : Window
         uninstallButton.IsEnabled = false;
         cancelButton.IsEnabled = false;
         removeUserData.IsEnabled = false;
-        statusText.Text = "Removing Joonga Metadata…";
+        statusText.Text = "Removing Joonga Tag…";
 
         try
         {
@@ -278,8 +279,8 @@ internal sealed class UninstallWindow : Window
 
         if (deleteUserData)
         {
-            DeleteDirectoryIfPresent(Path.Combine(userAppData, "Metadata Transfer"));
-            DeleteDirectoryIfPresent(Path.Combine(userLocalAppData, "Metadata Transfer"));
+            DeleteDirectoryIfPresent(Path.Combine(userAppData, Settings.ProductFolder));
+            DeleteDirectoryIfPresent(Path.Combine(userLocalAppData, Settings.ProductFolder));
         }
     }
 
@@ -299,14 +300,14 @@ internal sealed class UninstallWindow : Window
             string.Equals(full, programFilesX86, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Refusing to uninstall from Program Files root.");
 
-        if (!File.Exists(Path.Combine(full, "Joonga Metadata.exe")))
-            throw new InvalidOperationException("Joonga Metadata executable was not found in this directory.");
+        if (!File.Exists(Path.Combine(full, "Joonga Tag.exe")))
+            throw new InvalidOperationException("Joonga Tag executable was not found in this directory.");
     }
 
     private static void CloseOtherInstances()
     {
         int currentPid = Environment.ProcessId;
-        foreach (var proc in Process.GetProcessesByName("Joonga Metadata"))
+        foreach (var proc in Process.GetProcessesByName("Joonga Tag"))
         {
             using (proc)
             {
@@ -331,7 +332,7 @@ internal sealed class UninstallWindow : Window
 
     private static void RemoveMatchingShortcuts(string installDir, string userAppData)
     {
-        string exePath = Path.Combine(installDir, "Joonga Metadata.exe");
+        string exePath = Path.Combine(installDir, "Joonga Tag.exe");
         var candidates = new List<string>
         {
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), ShortcutFileName),

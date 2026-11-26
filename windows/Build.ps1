@@ -12,7 +12,7 @@ if ($ExifToolFolder) {
 Push-Location $PSScriptRoot
 try {
     if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { throw 'Install the .NET 10 SDK from https://dotnet.microsoft.com/download/dotnet/10.0 and run Build.ps1 again.' }
-    $output = Join-Path $PSScriptRoot "build/$Runtime/Joonga Metadata"
+    $output = Join-Path $PSScriptRoot "build/$Runtime/Joonga Tag"
     if (-not $ExifToolFolder) {
         $vendor = Join-Path $PSScriptRoot 'build/vendor'
         New-Item -ItemType Directory -Force $vendor | Out-Null
@@ -56,7 +56,7 @@ try {
         dotnet run --project MetadataTransfer.Tests -c Release -- (Join-Path $tools 'exiftool.exe')
         if ($LASTEXITCODE -ne 0) { throw 'Regression checks failed.' }
     }
-    $zip = Join-Path $PSScriptRoot "build/Joonga-Metadata-Windows-${Runtime}.zip"
+    $zip = Join-Path $PSScriptRoot "build/Joonga-Tag-Windows-${Runtime}.zip"
     Compress-Archive -Path $output -DestinationPath $zip -Force
     Write-Host "Ready: $zip"
     if (-not $SkipInstaller) {
@@ -71,8 +71,8 @@ try {
         $installerOut = Join-Path $PSScriptRoot "build/$Runtime/installer"
         dotnet publish MetadataTransfer.Installer/MetadataTransfer.Installer.csproj -c Release -r $Runtime --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true "-p:InstallerPayloadPath=$payloadZip" -o $installerOut
         if ($LASTEXITCODE -ne 0) { throw 'Windows installer build failed.' }
-        $setupExe = Join-Path $PSScriptRoot "build/Joonga-Metadata-Windows-${Runtime}-Setup.exe"
-        Copy-Item -LiteralPath (Join-Path $installerOut 'Joonga Metadata Setup.exe') -Destination $setupExe -Force
+        $setupExe = Join-Path $PSScriptRoot "build/Joonga-Tag-Windows-${Runtime}-Setup.exe"
+        Copy-Item -LiteralPath (Join-Path $installerOut 'Joonga Tag Setup.exe') -Destination $setupExe -Force
         Write-Host "Ready: $setupExe"
     }
 } finally { Pop-Location }

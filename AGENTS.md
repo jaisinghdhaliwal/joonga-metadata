@@ -1,7 +1,7 @@
-# Joonga Metadata — contributor and agent guide
+# Joonga Tag — contributor and agent guide
 
 This is the maintained handoff document for people and AI agents working on
-Joonga Metadata. Read it before changing code, documentation, builds, release
+Joonga Tag. Read it before changing code, documentation, builds, release
 assets or product behaviour.
 
 ## Mandatory context maintenance
@@ -26,7 +26,7 @@ material or local machine paths in this repository.
 
 ## Product
 
-Joonga Metadata is a native desktop app for photographers and videographers to
+Joonga Tag is a native desktop app for photographers and videographers to
 inspect, edit, geotag and transfer photo/video metadata without re-encoding
 media. It uses ExifTool for reads and writes and supports common formats,
 including DNG, AVIF, JPEG, ARW and MP4.
@@ -37,7 +37,7 @@ system-native while still supporting detailed batch work.
 
 ## Branding and visual provenance
 
-Joonga Metadata is part of the personal **Joonga** brand. Its visual language
+Joonga Tag is part of the personal **Joonga** brand. Its visual language
 comes from Jai Singh Dhaliwal's portfolio site,
 [jaisinghdhaliwal.github.io](https://jaisinghdhaliwal.github.io), rather than
 from a generic developer-tool palette.
@@ -53,8 +53,8 @@ from a generic developer-tool palette.
 - The macOS icon is authored in Apple Icon Composer. Preserve the current
   editable `macos/AppIcon *.icon` source and use its compiled artwork for macOS
   builds; do not silently fall back to a different generic icon.
-- The product was renamed from Metadata Transfer to Joonga Metadata, but legacy
-  user-data locations intentionally retain the old name for compatibility.
+- The product was renamed from Metadata Transfer to Joonga Metadata and then
+  to Joonga Tag. The GitHub repository address remains `jaisinghdhaliwal/joonga-metadata`.
 
 The design bar is “convincingly native”, not merely decorated: use Finder/Photos
 and Windows 11 Settings as references for density, typography, window chrome,
@@ -131,7 +131,7 @@ inspired by Apple Photos.
 | `macos/Sources/` | macOS UI, metadata reading/writing, workflows, file actions, map/location and Quick Look. |
 | `windows/MetadataTransfer.Core/` | Platform-neutral models, matching, ExifTool integration and workflow persistence. |
 | `windows/MetadataTransfer.Windows/` | .NET 10 WPF UI, Mica/Fluent setup, integrated uninstaller (`--uninstall`), panes, inspector, map, preview, settings and workflows. |
-| `windows/MetadataTransfer.Installer/` | Single-file self-contained .NET 10 WPF Windows 11 Fluent Setup wizard (`Joonga Metadata Setup.exe`). |
+| `windows/MetadataTransfer.Installer/` | Single-file self-contained .NET 10 WPF Windows 11 Fluent Setup wizard (`Joonga Tag Setup.exe`). |
 | `windows/MetadataTransfer.Tests/` | Dependency-free regression runner and synthetic fixtures. |
 | `windows/Build.ps1` | Windows restore, pinned ExifTool verification, self-contained publish, test, portable ZIP and single-file `Setup.exe` build. |
 | `assets/` | Icon previews, SVGs and Icon Composer artwork. |
@@ -144,7 +144,7 @@ inspired by Apple Photos.
 - Entry point: `macos/Sources/main.swift`.
 - Build with `bash macos/build.command`. It produces an ad-hoc-signed
   universal `arm64` + `x86_64` app at
-  `macos/build/Joonga Metadata.app`.
+  `macos/build/Joonga Tag.app`.
 - The current editable Icon Composer source is the newest `macos/AppIcon *.icon`
   directory in the worktree (`macos/build.command` selects the newest
   `AppIcon*.icon` containing `icon.json`). `AppIcon.icns` is only a static
@@ -157,9 +157,11 @@ inspired by Apple Photos.
   only if unbundled). Settings allows configuring a custom ExifTool path
   (stored in Preferences as `CustomExifToolPath`, validated with `-ver`) and
   restoring the app-bundled ExifTool with one button.
-- Existing users retain legacy storage locations:
-  `~/Library/Application Support/Metadata Transfer/Workflows.json`; settings
-  use the app's Preferences storage.
+- Workflows are stored at `~/Library/Application Support/Joonga Tag/Workflows.json`
+  and settings use the preference domain `com.jaisinghdhaliwal.joongatag`.
+  On first launch the app copies preferences from `local.codex.metadatapreview`
+  and imports workflows from `~/Library/Application Support/Metadata Transfer/Workflows.json`
+  when a new workflow library is missing.
 - Apple Maps tiles and place search require a network connection.
 
 ### Windows
@@ -171,14 +173,14 @@ inspired by Apple Photos.
   `MapPane.cs`, `WindowHeader.cs`, `SettingsWindow.cs`,
   `WorkflowWindow.cs`, `UninstallWindow.cs` and `WorkspaceStyles.xaml`.
 - Installer (`windows/MetadataTransfer.Installer/`): embeds `Payload.zip` as a
-  managed resource inside a single-file `Joonga Metadata Setup.exe`, supports
-  all-users (`Program Files\Joonga Metadata`), current-user
-  (`%LocalAppData%\Programs\Joonga Metadata`), or custom folder selection, UAC
+  managed resource inside a single-file `Joonga Tag Setup.exe`, supports
+  all-users (`Program Files\Joonga Tag`), current-user
+  (`%LocalAppData%\Programs\Joonga Tag`), or custom folder selection, UAC
   self-elevation, Start Menu/Desktop `.lnk` shortcuts via COM `IShellLinkW`,
   `HKLM`/`HKCU` Apps & Features uninstall registration, `--install --quiet`
   automation, and `--smoke-test`. The main app handles `--uninstall` (and
   `--uninstall --quiet`) in `UninstallWindow.cs` with optional user-data
-  removal (`%APPDATA%\Metadata Transfer` and `%LOCALAPPDATA%\Metadata Transfer`)
+  removal (`%APPDATA%\Joonga Tag` and `%LOCALAPPDATA%\Joonga Tag`)
   and detached `cmd.exe` directory cleanup.
 - `ExifService` uses UTF-8 argument files (`-charset filename=UTF8 -@`) for
   read, location, write, copy, and workspace batch invocations so non-ASCII
@@ -189,9 +191,12 @@ inspired by Apple Photos.
 - Builds are self-contained for `win-x64` and `win-arm64`. ARM64 uses native
   .NET/WPF; official x64 ExifTool works through Windows 11 emulation.
 - Persistent paths:
-  - workflows: `%APPDATA%\\Metadata Transfer\\Workflows.json`
-  - settings: `%LOCALAPPDATA%\\Metadata Transfer\\Settings.json`
-  - WebView2 cache: `%LOCALAPPDATA%\\Metadata Transfer\\WebView2`
+  - workflows: `%APPDATA%\Joonga Tag\Workflows.json`
+  - settings: `%LOCALAPPDATA%\Joonga Tag\Settings.json`
+  - WebView2 cache: `%LOCALAPPDATA%\Joonga Tag\WebView2`
+- The new app copies the settings and workflow files from the corresponding
+  `Metadata Transfer` folders only when the new files are missing.
+  The Joonga Tag installer uses its own uninstall registration.
 
 ### Metadata flow
 
@@ -363,6 +368,11 @@ mouse behaviour. Do not claim this has been visually verified solely because a
 cross-build succeeds.
 
 ## Distribution
+
+New release assets must use the Joonga Tag prefix, including
+`Joonga-Tag-<version>-macOS.zip` and
+`Joonga-Tag-<version>-Windows-<architecture>-Setup.exe`. Published Joonga
+Metadata releases retain their original asset names.
 
 Both apps expose Check for Updates in About. They read the latest stable
 GitHub release and verify the matching asset against its GitHub SHA-256 digest.

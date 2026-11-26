@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/windows-icon.png" alt="Joonga Metadata stacked tags" width="112">
+  <img src="assets/windows-icon.png" alt="Joonga Tag stacked tags" width="112">
 </p>
 
-<h1 align="center">Joonga Metadata</h1>
+<h1 align="center">Joonga Tag</h1>
 
 <p align="center">
   Compare, edit, and transfer photo and video metadata on macOS and Windows.
@@ -12,9 +12,13 @@
 
 Get the latest builds from [GitHub Releases](https://github.com/jaisinghdhaliwal/joonga-metadata/releases).
 
+Joonga Tag was previously called Joonga Metadata. On first launch it copies
+existing settings and workflows into the new app’s storage. **About Joonga Tag**
+can check GitHub for newer releases and install verified updates.
+
 | macOS | Windows |
 | :---: | :---: |
-| <img src="assets/macos-icon.png" alt="Joonga Metadata macOS app icon" width="64"> | <img src="assets/windows-icon.png" alt="Joonga Metadata Windows app icon" width="64"> |
+| <img src="assets/macos-icon.png" alt="Joonga Tag macOS app icon" width="64"> | <img src="assets/windows-icon.png" alt="Joonga Tag Windows app icon" width="64"> |
 | Apple silicon release · Universal build from source | x64 and ARM64 releases |
 | [macOS setup and usage](docs/macos.md) | [Windows setup and usage](docs/windows/README.md) |
 
@@ -43,7 +47,7 @@ Metadata and Map share a resizable file pane and selection, with separate column
 ## Repository layout
 
 - `macos/` contains the SwiftUI and AppKit app and its build script.
-- `windows/` contains the WPF app, metadata engine, and regression tests in one [Visual Studio solution](windows/JoongaMetadata.slnx).
-- `assets/` contains the [macOS](assets/macos-icon.png) and [Windows](assets/windows-icon.png) icon previews, plus the [macOS logo SVG](assets/joonga-metadata-mac-logo.svg) and [Windows icon SVG](assets/joonga-metadata-windows-icon.svg).
+- `windows/` contains the WPF app, metadata engine, and regression tests in one [Visual Studio solution](windows/JoongaTag.slnx).
+- `assets/` contains the [macOS](assets/macos-icon.png) and [Windows](assets/windows-icon.png) icon previews, plus the [macOS logo SVG](assets/joonga-tag-mac-logo.svg) and [Windows icon SVG](assets/joonga-tag-windows-icon.svg).
 - `docs/` contains platform guides, testing notes, and [third-party notices](docs/windows/THIRD-PARTY-NOTICES.md).
 - `.github/workflows/` contains the macOS build and the Windows build and smoke test.

@@ -89,8 +89,26 @@ public sealed class Settings
     public Dictionary<string, List<string>> MediaColumns { get; set; } = [];
     public double Width { get; set; } = 1360;
     public double Height { get; set; } = 860;
-    public static string Folder => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Metadata Transfer");
-    public static string FilePath => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Metadata Transfer", "Settings.json");
+    public const string ProductFolder = "Joonga Tag";
+    public static string Folder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ProductFolder);
+    public static string LocalFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ProductFolder);
+    public static string FilePath => Path.Combine(LocalFolder, "Settings.json");
+
+    public static void MigrateLegacyData()
+    {
+        CopyIfMissing(Environment.SpecialFolder.ApplicationData, "Workflows.json", Folder);
+        CopyIfMissing(Environment.SpecialFolder.LocalApplicationData, "Settings.json", LocalFolder);
+    }
+
+    private static void CopyIfMissing(Environment.SpecialFolder scope, string name, string folder)
+    {
+        string legacy = Path.Combine(Environment.GetFolderPath(scope), "Metadata Transfer", name);
+        string destination = Path.Combine(folder, name);
+        if (File.Exists(destination) || !File.Exists(legacy)) return;
+        Directory.CreateDirectory(folder);
+        try { File.Copy(legacy, destination, overwrite: false); }
+        catch (IOException) when (File.Exists(destination)) { }
+    }
     public static Settings Load() => File.Exists(FilePath) ? JsonSerializer.Deserialize<Settings>(File.ReadAllText(FilePath), WorkflowStore.Json) ?? new() : new();
     public void Save() => AtomicFile.Write(FilePath, JsonSerializer.Serialize(this, WorkflowStore.Json));
 }

@@ -23,15 +23,15 @@ internal sealed record ExistingInstall(string InstallLocation, string DisplayVer
 
 internal static class InstallEngine
 {
-    public const string AppName = "Joonga Metadata";
+    public const string AppName = "Joonga Tag";
     public const string AppVersion = "0.9.2";
     public const string Publisher = "Jai Singh Dhaliwal";
-    public const string UninstallKeyName = "JoongaMetadata";
+    public const string UninstallKeyName = "JoongaTag";
     public const string UninstallSubkey = $@"Software\Microsoft\Windows\CurrentVersion\Uninstall\{UninstallKeyName}";
-    public const string PayloadResourceName = "JoongaMetadata.Payload.zip";
+    public const string PayloadResourceName = "JoongaTag.Payload.zip";
     public const string InfoUrl = "https://github.com/jaisinghdhaliwal/joonga-metadata";
-    public const string ExecutableName = "Joonga Metadata.exe";
-    public const string ShortcutFileName = "Joonga Metadata.lnk";
+    public const string ExecutableName = "Joonga Tag.exe";
+    public const string ShortcutFileName = "Joonga Tag.lnk";
 
     public static string DefaultAllUsersDir =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), AppName);
@@ -84,7 +84,7 @@ internal static class InstallEngine
         try
         {
             if (!Path.IsPathFullyQualified(trimmed))
-                return (false, null, "Enter a full folder path (for example, C:\\Program Files\\Joonga Metadata).");
+                return (false, null, "Enter a full folder path (for example, C:\\Program Files\\Joonga Tag).");
 
             full = NormalizeDirectory(trimmed);
         }
@@ -106,7 +106,7 @@ internal static class InstallEngine
             string.Equals(full, windowsDir, StringComparison.OrdinalIgnoreCase) ||
             IsUnderDirectory(full, windowsDir))
         {
-            return (false, null, "Choose a dedicated application folder (such as Program Files\\Joonga Metadata).");
+            return (false, null, "Choose a dedicated application folder (such as Program Files\\Joonga Tag).");
         }
 
         return (true, full, null);
@@ -167,7 +167,7 @@ internal static class InstallEngine
         await Task.Run(() =>
         {
             ct.ThrowIfCancellationRequested();
-            progress.Report(new InstallProgress(0.02, "Closing running Joonga Metadata windows…"));
+            progress.Report(new InstallProgress(0.02, "Closing running Joonga Tag windows…"));
             if (options.Update) WaitForApplicationExit(ct);
             else CloseRunningApplication();
 
@@ -307,7 +307,7 @@ internal static class InstallEngine
         var hive = allUsers ? RegistryHive.LocalMachine : RegistryHive.CurrentUser;
         using var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
         using var key = baseKey.CreateSubKey(UninstallSubkey, writable: true)
-            ?? throw new InvalidOperationException("Unable to register Joonga Metadata in Windows Apps & Features.");
+            ?? throw new InvalidOperationException("Unable to register Joonga Tag in Windows Apps & Features.");
 
         key.SetValue("DisplayName", AppName, RegistryValueKind.String);
         key.SetValue("DisplayVersion", AppVersion, RegistryValueKind.String);
@@ -328,12 +328,12 @@ internal static class InstallEngine
         while (timer.Elapsed < TimeSpan.FromSeconds(30))
         {
             token.ThrowIfCancellationRequested();
-            var processes = Process.GetProcessesByName("Joonga Metadata");
+            var processes = Process.GetProcessesByName("Joonga Tag");
             if (processes.Length == 0) return;
             foreach (var process in processes) process.Dispose();
             token.WaitHandle.WaitOne(250);
         }
-        throw new IOException("Close any remaining Joonga Metadata windows, then run the update again.");
+        throw new IOException("Close any remaining Joonga Tag windows, then run the update again.");
     }
 
     private sealed class UpdateRollback(string installDirectory) : IDisposable
@@ -384,7 +384,7 @@ internal static class InstallEngine
 
     private static void CloseRunningApplication()
     {
-        foreach (var proc in Process.GetProcessesByName("Joonga Metadata"))
+        foreach (var proc in Process.GetProcessesByName("Joonga Tag"))
         {
             using (proc)
             {

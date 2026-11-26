@@ -15,7 +15,7 @@ struct AboutJoongaView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 56, height: 56)
-            Text("Joonga Metadata").font(.title2.bold())
+            Text("Joonga Tag").font(.title2.bold())
             Text("Version " + version).foregroundStyle(.secondary)
             if !status.isEmpty {
                 Text(status).font(.callout).textSelection(.enabled)
@@ -95,13 +95,13 @@ enum MacAppUpdater {
     }
 
     static func failure(_ message: String) -> NSError {
-        NSError(domain: "JoongaMetadata.Update", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+        NSError(domain: "JoongaTag.Update", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
     }
 
     static func check(installed: String) async throws -> Release? {
         let endpoint = URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!
         var request = URLRequest(url: endpoint, timeoutInterval: 30)
-        request.setValue("JoongaMetadata-Updater", forHTTPHeaderField: "User-Agent")
+        request.setValue("JoongaTag-Updater", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw failure("GitHub did not return the latest release.")
@@ -114,7 +114,7 @@ enum MacAppUpdater {
         }
         let version = String(release.tag_name.dropFirst())
         guard version.compare(installed, options: .numeric) == .orderedDescending else { return nil }
-        let name = "Joonga-Metadata-\(version)-macOS.zip"
+        let name = "Joonga-Tag-\(version)-macOS.zip"
         let expected = "https://github.com/\(repository)/releases/download/\(release.tag_name)/\(name)"
         guard let asset = release.assets.first(where: { $0.name == name && $0.browser_download_url.absoluteString == expected }) else {
             throw failure("This release has no macOS update archive.")
@@ -130,7 +130,7 @@ enum MacAppUpdater {
         let files = FileManager.default
         let parent = destination.deletingLastPathComponent()
         guard destination.pathExtension == "app", files.isWritableFile(atPath: parent.path) else {
-            throw failure("Move Joonga Metadata to a writable Applications folder and try again.")
+            throw failure("Move Joonga Tag to a writable Applications folder and try again.")
         }
         guard release.size > 0, release.size <= 512 * 1024 * 1024 else { throw failure("Unexpected archive size.") }
         let stage = parent.appendingPathComponent(".joonga-update-" + UUID().uuidString, isDirectory: true)
@@ -149,7 +149,7 @@ enum MacAppUpdater {
             let actual = checksum.finalize().map { String(format: "%02x", $0) }.joined()
             guard actual == release.digest else { throw failure("Archive checksum did not match GitHub.") }
             try run("/usr/bin/ditto", ["-x", "-k", download.path, stage.path])
-            let candidate = stage.appendingPathComponent("Joonga Metadata.app", isDirectory: true)
+            let candidate = stage.appendingPathComponent("Joonga Tag.app", isDirectory: true)
             guard let id = identifier, let bundle = Bundle(url: candidate), bundle.bundleIdentifier == id,
                   bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String == release.version else {
                 throw failure("The archive does not match this app and release.")
@@ -178,7 +178,7 @@ enum MacAppUpdater {
         // bundle available until the new one is in place.
         process.arguments = ["-c", """
           pid="$1"; stage="$2"; destination="$3"
-          candidate="$stage/Joonga Metadata.app"; previous="$stage/Previous.app"
+          candidate="$stage/Joonga Tag.app"; previous="$stage/Previous.app"
           attempts=0
           while kill -0 "$pid" 2>/dev/null; do
             attempts=$((attempts+1))
@@ -193,7 +193,7 @@ enum MacAppUpdater {
             /bin/mv "$previous" "$destination"
           fi
           /usr/bin/open "$destination"
-          /usr/bin/osascript -e 'display alert "Joonga Metadata update could not be installed."'
+          /usr/bin/osascript -e 'display alert "Joonga Tag update could not be installed."'
           """, "joonga-update", String(ProcessInfo.processInfo.processIdentifier), staged.path, destination.path]
         try process.run()
     }

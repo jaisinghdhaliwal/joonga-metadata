@@ -1,17 +1,17 @@
-# Joonga Metadata for Windows
+# Joonga Tag for Windows
 
 A native Windows metadata editor and transfer utility, built with C#, .NET 10 WPF, Microsoft's Fluent controls and the Windows 11 Mica backdrop. It follows the system's light, dark, accent and high-contrast settings. The title bar puts app commands alongside the window controls. Drag the space between command groups to move the window, or double-click it to maximise or restore.
 
 ## Install or Run
 
 **Installer (recommended):**
-1. Choose **Joonga-Metadata-*-Windows-x64-Setup.exe** for Intel/AMD PCs, or **Joonga-Metadata-*-Windows-arm64-Setup.exe** for Windows on ARM.
-2. Run the Windows 11 Setup wizard to install to `Program Files\Joonga Metadata` (all users), `%LocalAppData%\Programs\Joonga Metadata` (current user), or a custom folder you choose, with optional Start Menu and Desktop shortcuts.
-3. Uninstall anytime from Windows **Settings → Apps → Installed apps** (or by running `"Joonga Metadata.exe" --uninstall`).
+1. Choose **Joonga-Tag-*-Windows-x64-Setup.exe** for Intel/AMD PCs, or **Joonga-Tag-*-Windows-arm64-Setup.exe** for Windows on ARM.
+2. Run the Windows 11 Setup wizard to install to `Program Files\Joonga Tag` (all users), `%LocalAppData%\Programs\Joonga Tag` (current user), or a custom folder you choose, with optional Start Menu and Desktop shortcuts.
+3. Uninstall anytime from Windows **Settings → Apps → Installed apps** (or by running `"Joonga Tag.exe" --uninstall`).
 
 **Portable ZIP:**
 1. Choose the **win-x64** ZIP for Intel/AMD PCs, or **win-arm64** for Windows on ARM.
-2. Extract the entire folder. Run **Joonga Metadata.exe** inside it.
+2. Extract the entire folder. Run **Joonga Tag.exe** inside it.
 3. Keep `tools`, `exiftool_files`, runtime DLLs and the other supporting files with the executable. This is a portable folder, not a single-file executable.
 
 The .NET runtime and ExifTool are included. Administrator access and a separate .NET installation are not required. The optional map preview uses the Microsoft Edge WebView2 Runtime normally present on Windows 11. If it is unavailable, the map window reports that requirement. Metadata features do not depend on WebView2 or an internet connection.
@@ -47,13 +47,13 @@ Shell thumbnails use Windows' installed codecs. AVIF/HEIF/RAW and less common vi
 
 Select files in either pane, click the **Workflows** icon in the toolbar, and choose a saved workflow to stage it for that selection. The list refreshes whenever you open the menu. Use **Manage Workflows** to edit presets or choose a different target scope.
 
-Joonga Metadata keeps the existing Metadata Transfer storage paths so earlier workflows and preferences carry over. Workflows use the same versioned JSON archive as the Mac application. Import/export individual workflows, multiple selected workflows, entire libraries or several JSON files together. Import validates every input before saving and preserves operation order. Personal presets are not compiled into the app.
+Joonga Tag copies settings and workflows from the old `Metadata Transfer` folders when the corresponding new file is missing. After verifying the data in Joonga Tag, you can remove the legacy files. Workflows use the same versioned JSON archive as the Mac application. Import/export individual workflows, multiple selected workflows, entire libraries or several JSON files together. Import validates every input before saving and preserves operation order. Personal presets are kept in your profile.
 
 **New**, **Duplicate**, **Delete** and **Save workflow** manage presets. The editor is one large text box: one `-Tag=Value` or `-Destination<Source` operation per line, with no shell quoting. Standard Ctrl+C/V/X/A/Z/Y shortcuts work. Invalid lines are identified before applying. Unsaved workflow changes prompt Save/Discard/Cancel when leaving the editor. Targets default to the active file selection; all-originals/all-exports scopes are also available.
 
-- Workflows: `%APPDATA%\Metadata Transfer\Workflows.json`
-- Preferences: `%LOCALAPPDATA%\Metadata Transfer\Settings.json`
-- Map browser cache: `%LOCALAPPDATA%\Metadata Transfer\WebView2`
+- Workflows: `%APPDATA%\Joonga Tag\Workflows.json`
+- Preferences: `%LOCALAPPDATA%\Joonga Tag\Settings.json`
+- Map browser cache: `%LOCALAPPDATA%\Joonga Tag\WebView2`
 
 Open the **Settings** gear or press Ctrl+comma to choose or clear the default exports folder, show or hide the preview, open the workflow library, and configure ExifTool. The default exports folder is used on the next launch. You can also save the current export folder from its pane menu. If you configure another ExifTool installation, rename `exiftool(-k).exe` to `exiftool.exe`, and keep its full `exiftool_files` folder alongside it. Closing the main window exits the app. Pending writes must finish (or be cancelled between files); unsaved edits prompt before exit.
 

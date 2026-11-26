@@ -17,15 +17,15 @@ jobs:
       - name: Build and verify the app bundle
         run: |
           bash macos/build.command
-          test -s "macos/build/Joonga Metadata.app/Contents/Resources/Assets.car"
-          test -x "macos/build/Joonga Metadata.app/Contents/Resources/exiftool/exiftool"
-          "macos/build/Joonga Metadata.app/Contents/Resources/exiftool/exiftool" -ver
-          xcrun lipo "macos/build/Joonga Metadata.app/Contents/MacOS/Joonga Metadata" -verify_arch arm64 x86_64
-          codesign --verify --strict --all-architectures "macos/build/Joonga Metadata.app"
+          test -s "macos/build/Joonga Tag.app/Contents/Resources/Assets.car"
+          test -x "macos/build/Joonga Tag.app/Contents/Resources/exiftool/exiftool"
+          "macos/build/Joonga Tag.app/Contents/Resources/exiftool/exiftool" -ver
+          xcrun lipo "macos/build/Joonga Tag.app/Contents/MacOS/Joonga Tag" -verify_arch arm64 x86_64
+          codesign --verify --strict --all-architectures "macos/build/Joonga Tag.app"
       - name: Package the app
-        run: ditto -c -k --keepParent "macos/build/Joonga Metadata.app" macos/build/Joonga-Metadata-macOS.zip
+        run: ditto -c -k --keepParent "macos/build/Joonga Tag.app" macos/build/Joonga-Tag-macOS.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: Joonga-Metadata-macOS
-          path: macos/build/Joonga-Metadata-macOS.zip
+          name: Joonga-Tag-macOS
+          path: macos/build/Joonga-Tag-macOS.zip
           if-no-files-found: error

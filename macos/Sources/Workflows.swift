@@ -81,6 +81,10 @@ extension Library {
         do {
             if FileManager.default.fileExists(atPath: workflowFile.path) {
                 presets = try WorkflowArchive.decode(Data(contentsOf: workflowFile))
+            } else if workflowFile == JoongaTagStorage.workflows,
+                      FileManager.default.fileExists(atPath: JoongaTagStorage.legacyWorkflows.path) {
+                let migrated = try WorkflowArchive.decode(Data(contentsOf: JoongaTagStorage.legacyWorkflows))
+                if !persistPresets(migrated) { presets = migrated }
             } else if let data = UserDefaults.standard.data(forKey: "PersonalPresets") {
                 let migrated = try JSONDecoder().decode([Preset].self, from: data)
                 _ = persistPresets(migrated)

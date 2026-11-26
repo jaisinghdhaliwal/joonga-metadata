@@ -49,7 +49,7 @@ final class Library: ObservableObject {
  @Published var favouriteLocationsVersion = UUID()
  var mediaLoadVersion = 0
  init(workflowFile: URL? = nil) {
-  self.workflowFile = workflowFile ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Metadata Transfer/Workflows.json")
+  self.workflowFile = workflowFile ?? JoongaTagStorage.workflows
   loadPresets()
   configureExifTool()
   if let data=UserDefaults.standard.data(forKey:"DefaultExportsBookmark") { var stale=false; defaultExports=try? URL(resolvingBookmarkData:data,options:[],relativeTo:nil,bookmarkDataIsStale:&stale); destination=defaultExports }
@@ -827,9 +827,12 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
  #if VISUAL_REVIEW
  let library=Library(workflowFile:FileManager.default.temporaryDirectory.appendingPathComponent("MetadataTransfer-Review-" + UUID().uuidString + "/Workflows.json"))
  #else
- let library=Library()
+ let library: Library = {
+  JoongaTagStorage.migratePreferences()
+  return Library()
+ }()
  #endif
- private let productName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Joonga Metadata"
+ private let productName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Joonga Tag"
  private weak var workflowMenu: NSMenu?
  private var workflowCommandCount = 0
  private var workspaceClosed = false
@@ -847,13 +850,13 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
   let alert = NSAlert()
   if library.busy {
    alert.messageText = "An operation is still running"
-   alert.informativeText = "Wait for it to finish before closing Joonga Metadata."
+   alert.informativeText = "Wait for it to finish before closing Joonga Tag."
    alert.runModal()
    return false
   }
   guard !library.pendingPaths.isEmpty else { return true }
   alert.messageText = "Discard unsaved metadata edits?"
-  alert.informativeText = "Pending edits will be lost if you close Joonga Metadata."
+  alert.informativeText = "Pending edits will be lost if you close Joonga Tag."
   alert.addButton(withTitle: "Keep Editing")
   alert.addButton(withTitle: "Discard Edits").hasDestructiveAction = true
   return alert.runModal() == .alertSecondButtonReturn

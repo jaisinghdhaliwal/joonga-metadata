@@ -17,7 +17,7 @@ internal static class AppUpdater
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromMinutes(5) };
     private sealed record Release(string Tag, Uri Asset, byte[] Digest, long Size);
 
-    static AppUpdater() => Client.DefaultRequestHeaders.UserAgent.ParseAdd("JoongaMetadata-Updater");
+    static AppUpdater() => Client.DefaultRequestHeaders.UserAgent.ParseAdd("JoongaTag-Updater");
 
     public static void ShowAbout(Window owner, Func<bool> canInstall)
     {
@@ -101,7 +101,7 @@ internal static class AppUpdater
             Architecture.Arm64 => "arm64",
             _ => throw new PlatformNotSupportedException("This architecture has no published installer.")
         };
-        string name = $"Joonga-Metadata-{tag[1..]}-Windows-{architecture}-Setup.exe";
+        string name = $"Joonga-Tag-{tag[1..]}-Windows-{architecture}-Setup.exe";
         string expected = $"https://github.com/{Repository}/releases/download/{tag}/{name}";
         foreach (var asset in root.GetProperty("assets").EnumerateArray())
         {
@@ -118,7 +118,7 @@ internal static class AppUpdater
     private static async Task InstallAsync(Release release)
     {
         string directory = Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory);
-        if (!File.Exists(Path.Combine(directory, "Joonga Metadata.dll")))
+        if (!File.Exists(Path.Combine(directory, "Joonga Tag.dll")))
             throw new IOException("Could not identify the existing app folder.");
         bool allUsers = directory.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles) +
             Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
@@ -129,7 +129,7 @@ internal static class AppUpdater
         if (release.Size <= 0 || release.Size > 512L * 1024 * 1024)
             throw new InvalidDataException("Unexpected installer size.");
         var staging = Directory.CreateTempSubdirectory("JoongaUpdate-");
-        string installer = Path.Combine(staging.FullName, "Joonga Metadata Setup.exe");
+        string installer = Path.Combine(staging.FullName, "Joonga Tag Setup.exe");
         try
         {
             using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(5));
@@ -172,7 +172,7 @@ internal static class AppUpdater
     private static bool IsRegistered(RegistryHive registryHive, string directory)
     {
         using var hive = RegistryKey.OpenBaseKey(registryHive, RegistryView.Registry64);
-        using var key = hive.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\JoongaMetadata");
+        using var key = hive.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\JoongaTag");
         return string.Equals((key?.GetValue("InstallLocation") as string)?.TrimEnd('\\'), directory, StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -10,8 +10,8 @@
           "fill" : "automatic",
           "glass" : true,
           "hidden" : false,
-          "image-name" : "joonga-metadata-mac-logo.svg",
-          "name" : "joonga-metadata-mac-logo",
+          "image-name" : "joonga-tag-mac-logo.svg",
+          "name" : "joonga-tag-mac-logo",
           "opacity" : 0.39,
           "position" : {
             "scale" : 1.18,
@@ -26,8 +26,8 @@
           "fill" : "automatic",
           "glass" : false,
           "hidden" : false,
-          "image-name" : "joonga-metadata-mac-logo.svg",
-          "name" : "joonga-metadata-mac-logo",
+          "image-name" : "joonga-tag-mac-logo.svg",
+          "name" : "joonga-tag-mac-logo",
           "opacity" : 1,
           "position" : {
             "scale" : 1.18,

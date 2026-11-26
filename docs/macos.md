@@ -1,18 +1,18 @@
-# Joonga Metadata for macOS
+# Joonga Tag for macOS
 
 A native macOS application for comparing, editing and copying media metadata. Built with SwiftUI, AppKit, Quick Look and MapKit. The universal build runs on Apple silicon and Intel Macs with macOS 13 or later.
 
-ExifTool 13.64 is bundled inside the app (`Contents/Resources/exiftool/`), so metadata operations work without a separate installation. If you install a newer ExifTool separately (for example via Homebrew at `/opt/homebrew/bin/exiftool`), you can point Joonga Metadata to it in **Settings** and restore the app-bundled ExifTool at any time.
+ExifTool 13.64 is bundled inside the app (`Contents/Resources/exiftool/`), so metadata operations work without a separate installation. If you install a newer ExifTool separately (for example via Homebrew at `/opt/homebrew/bin/exiftool`), you can point Joonga Tag to it in **Settings** and restore the app-bundled ExifTool at any time.
 
 ## Build
 
-Install Xcode 26 or newer and run `bash macos/build.command` from the repository root to compile the layered Icon Composer icon, download and verify the pinned ExifTool distribution (`13.64`), and assemble the app bundle. Set `EXIFTOOL_DIR` to an already-extracted ExifTool directory to build without downloading. If you already compiled this icon into an asset catalog, run `bash macos/build.command --icon-catalog /path/to/Assets.car` to reuse it. With Command Line Tools only, run `bash macos/build.command --compat-icon` to use the static compatibility icon. Both architectures are built and combined into `macos/build/Joonga Metadata.app`.
+Install Xcode 26 or newer and run `bash macos/build.command` from the repository root to compile the layered Icon Composer icon, download and verify the pinned ExifTool distribution (`13.64`), and assemble the app bundle. Set `EXIFTOOL_DIR` to an already-extracted ExifTool directory to build without downloading. If you already compiled this icon into an asset catalog, run `bash macos/build.command --icon-catalog /path/to/Assets.car` to reuse it. With Command Line Tools only, run `bash macos/build.command --compat-icon` to use the static compatibility icon. Both architectures are built and combined into `macos/build/Joonga Tag.app`.
 
 ## Workflow library
 
 Select files in either pane and click a saved workflow in the **Workflows** menu to stage it for that selection. The list refreshes whenever you open the menu. Use **Manage Workflows** to edit presets or choose a different target scope.
 
-Joonga Metadata keeps the existing Metadata Transfer storage paths so earlier workflows and preferences carry over. Personal workflow data lives at `~/Library/Application Support/Metadata Transfer/Workflows.json`. Settings such as the saved exports folder use Preferences. This source distribution and the app bundle include no personal preset JSON files. New installations start with an empty library. Existing personal presets from earlier Preferences storage migrate to Application Support when no library file exists. A saved empty library stays empty after workflows are deleted.
+Joonga Tag stores workflows at `~/Library/Application Support/Joonga Tag/Workflows.json` and settings in `~/Library/Preferences/com.jaisinghdhaliwal.joongatag.plist`. It copies existing data from `~/Library/Application Support/Metadata Transfer/Workflows.json` and the preference domain `local.codex.metadatapreview` when migrating. After confirming your workflows and settings in Joonga Tag, you can remove those legacy files. New installations start with an empty workflow library.
 
 Open Workflows from the toolbar. Use New Workflow or Command-N, name it, and enter ExifTool metadata operations in the large editor, one per line. Save Workflow or Command-S creates or updates that workflow. Duplicate starts a separate copy. Select one or multiple workflows and use Delete, or press Delete while the workflow list has focus. Import accepts several JSON libraries. Export saves selected workflows or the complete library as a portable, versioned JSON file. Import merges exact duplicates and validates all selected files before saving.
 
@@ -34,7 +34,7 @@ Add files or folders in Preview, Metadata or Map. Select files in Map and click 
 
 Set **System Settings → Appearance → Accent colour** to **Multicolour** to use Joonga coral for in-app controls and active file selection. Any explicit system accent, including Blue or Graphite, takes precedence. File selection uses a quieter highlight when the workspace is inactive.
 
-Open **Joonga Metadata → Settings** with Command-comma. Set the default exports folder for future launches, choose whether to show the preview on startup, change the ExifTool path or restore the app-bundled ExifTool, or open the workflow library folder. Use **File** for choosing and opening folders, copying metadata, and saving edits. **View** contains preview, navigation, and refresh commands. **Workflows** opens the editor and library.
+Open **Joonga Tag → Settings** with Command-comma. Set the default exports folder for future launches, choose whether to show the preview on startup, change the ExifTool path or restore the app-bundled ExifTool, or open the workflow library folder. Use **File** for choosing and opening folders, copying metadata, and saving edits. **View** contains preview, navigation, and refresh commands. **Workflows** opens the editor and library.
 
 ## Shortcuts
 
@@ -46,7 +46,7 @@ In [macos](../macos), `Sources/` contains the app interface, workflow management
 
 ## Icon Composer artwork
 
-Import the [stacked tags SVG](../assets/joonga-metadata-mac-logo.svg) as a single layer, or import the [separate SVGs](../assets/icon-composer) to style each tag independently. Put the coral tag above the paper tag and set the background to navy (`#131E29`) in Icon Composer. Both layers use the same 1024 × 1024 canvas and retain their relative placement. [Apple’s import guide](https://developer.apple.com/documentation/xcode/creating-your-app-icon-using-icon-composer)
+Import the [stacked tags SVG](../assets/joonga-tag-mac-logo.svg) as a single layer, or import the [separate SVGs](../assets/icon-composer) to style each tag independently. Put the coral tag above the paper tag and set the background to navy (`#131E29`) in Icon Composer. Both layers use the same 1024 × 1024 canvas and retain their relative placement. [Apple’s import guide](https://developer.apple.com/documentation/xcode/creating-your-app-icon-using-icon-composer)
 
 ## Validation
 

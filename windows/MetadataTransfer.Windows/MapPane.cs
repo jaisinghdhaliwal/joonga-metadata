@@ -13,7 +13,7 @@ namespace MetadataTransfer.Windows;
 
 internal sealed class MapPane : DockPanel, IDisposable
 {
-    private const string MapHost = "joonga-metadata.example";
+    private const string MapHost = "joonga-tag.example";
     private const string MapPage = "https://" + MapHost + "/index.html";
     private const string Attribution = "https://www.openstreetmap.org/copyright";
     private readonly WebView2 browser = new();
@@ -113,15 +113,14 @@ internal sealed class MapPane : DockPanel, IDisposable
             try
             {
                 // Reuse the existing tile cache and browser profile.
-                var profile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "Metadata Transfer", "WebView2");
+                var profile = Path.Combine(Settings.LocalFolder, "WebView2");
                 var environment = await CoreWebView2Environment.CreateAsync(null, profile);
                 if (closed) return;
                 await browser.EnsureCoreWebView2Async(environment);
                 if (closed) return;
                 var core = browser.CoreWebView2;
                 core.Settings.AreDefaultContextMenusEnabled = false;
-                core.Settings.UserAgent += " JoongaMetadata/1.0";
+                core.Settings.UserAgent += " JoongaTag/1.0";
                 core.SetVirtualHostNameToFolderMapping(MapHost, Path.Combine(AppContext.BaseDirectory, "Assets", "Map"),
                     CoreWebView2HostResourceAccessKind.Deny);
                 core.NavigationStarting += (_, e) => e.Cancel = e.Uri != MapPage;
