@@ -295,21 +295,10 @@ struct WorkflowView: View {
                                 .buttonStyle(.plain).foregroundStyle(.secondary).help("Clear search")
                         }
                     }.padding(8).background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 7)).padding(12)
-                    List(selection: Binding(get: { selectedIDs }, set: { select($0) })) {
-                        ForEach(filteredPresets) { preset in
-                            HStack(spacing: 10) {
-                                Image(systemName: "slider.horizontal.3").foregroundStyle(.secondary).frame(width: 20)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(preset.name).font(.system(size: 12, weight: .medium)).lineLimit(2)
-                                    Text("\(preset.operations.count) assignments").font(.system(size: 10)).foregroundStyle(.secondary)
-                                }
-                            }.padding(.vertical, 6).tag(preset.id)
-                        }
-                    }.listStyle(.sidebar)
-                    .accentColor(accent.tint)
-                    .tint(accent.tint)
+                    PresetSelectionTable(presets: filteredPresets,
+                        selection: Binding(get: { selectedIDs }, set: { select($0) }),
+                        onDelete: { if !selectedIDs.isEmpty { confirmingDelete = true } })
                     .overlay { if filteredPresets.isEmpty { Text(search.isEmpty ? "Your presets appear here" : "No matching presets").font(.caption).foregroundStyle(.secondary).allowsHitTesting(false) } }
-                    .onDeleteCommand { if !selectedIDs.isEmpty { confirmingDelete = true } }
                     Divider()
                     HStack(spacing: 12) {
                         Button(action: newWorkflow) { Label("New", systemImage: "plus") }.help("New Preset · ⌘N")

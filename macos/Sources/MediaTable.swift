@@ -474,6 +474,10 @@ struct MediaTable: NSViewRepresentable {
     }
 }
 
+protocol AccentSelectionCell: AnyObject {
+    func applySelection(_ foreground: NSColor?)
+}
+
 final class AccentMediaRow: NSTableRowView {
     var accent = MacAccent()
 
@@ -497,7 +501,7 @@ final class AccentMediaRow: NSTableRowView {
 
     func refresh() {
         let foreground = isSelected ? accent.selectionForeground(active: usesEmphasis) : nil
-        for case let cell as MediaTableCell in subviews { cell.applySelection(foreground) }
+        for case let cell as AccentSelectionCell in subviews { cell.applySelection(foreground) }
         needsDisplay = true
     }
 
@@ -696,7 +700,7 @@ private final class MediaThumbnailView: NSView {
     }
 }
 
-private final class MediaTableCell: NSTableCellView {
+private final class MediaTableCell: NSTableCellView, AccentSelectionCell {
     private let titleLabel = NSTextField(labelWithString: "")
     private let detailLabel = NSTextField(labelWithString: "")
     private let thumbnailView = MediaThumbnailView(frame: NSRect(x: 0, y: 0, width: 42, height: 34))
