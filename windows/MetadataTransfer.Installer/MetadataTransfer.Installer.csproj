@@ -10,8 +10,8 @@
   <ApplicationIcon>../MetadataTransfer.Windows/Assets/AppIcon.ico</ApplicationIcon>
   <ApplicationManifest>app.manifest</ApplicationManifest>
   <NoWarn>$(NoWarn);WPF0001</NoWarn>
-  <Version>0.9.3</Version>
-  <FileVersion>0.9.3.0</FileVersion>
+  <Version>0.9.4</Version>
+  <FileVersion>0.9.4.0</FileVersion>
   <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
  </PropertyGroup>
  <ItemGroup>

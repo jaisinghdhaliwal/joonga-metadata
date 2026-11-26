@@ -3,8 +3,8 @@
   <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><EnableWindowsTargeting>true</EnableWindowsTargeting>
   <AssemblyName>Joonga Tag</AssemblyName><Product>Joonga Tag</Product><RootNamespace>MetadataTransfer.Windows</RootNamespace><ApplicationIcon>Assets/AppIcon.ico</ApplicationIcon>
   <ApplicationManifest>app.manifest</ApplicationManifest><NoWarn>$(NoWarn);WPF0001</NoWarn>
-  <Version>0.9.3</Version>
-  <FileVersion>0.9.3.0</FileVersion>
+  <Version>0.9.4</Version>
+  <FileVersion>0.9.4.0</FileVersion>
   <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
  </PropertyGroup>
  <ItemGroup><ProjectReference Include="../MetadataTransfer.Core/MetadataTransfer.Core.csproj"/><PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35"/></ItemGroup>
