@@ -240,21 +240,19 @@ inspired by Apple Photos.
   switching `ReadAsync`, `LocationAsync`, `WriteAsync`, and `CopyAsync` to
   UTF-8 argument files (`-charset filename=UTF8 -@`) with UTF-8 stdio
   decoding, matching `ReadWorkspaceBatchAsync`.
-- Verified `0.9.2` (commit `5ff3bf2d3a866d7b1584e3187971bd86471e8816`):
-  - macOS: `bash macos/build.command` succeeded (`AppIcon 9.icon` compiled to
+- Verified `0.9.3` (commit `a9c4c858145eae0cfba6258e0a6c8e2b3c2f0f62`):
+  - macOS: `bash macos/build.command` succeeded (`AppIcon 12.icon` compiled to
     `Assets.car`, ExifTool `13.64` bundled, `lipo -archs` confirmed
     `x86_64` + `arm64`, strict `codesign` passed, `CFBundleShortVersionString`
-    `0.9.2`), and GitHub Actions `macOS build` passed (run `45746628234`).
+    `0.9.3`), and GitHub Actions `macOS build` passed (run `45806456702`).
   - Windows: GitHub Actions `Windows build and tests` passed for both
-    `win-x64` and `win-arm64` (run `45746628207`), including
+    `win-x64` and `win-arm64` (run `45806456690`), including
     `MetadataTransfer.Tests`, native app `--smoke-test`, installer
-    `--smoke-test` (`installer-light.png` / `installer-dark.png`; light UI
-    renders cleanly with a minor vertical scrollbar in the 540px window), and
-    end-to-end silent install (`--quiet --install`), Start Menu shortcut /
-    `HKCU` uninstall registry verification, and silent uninstall
-    (`--uninstall --quiet`). Interactive UAC/all-users `Program Files`
-    install, Mica composition on desktop, and manual Windows 11 / macOS GUI
-    QA remain open.
+    `--smoke-test`, and end-to-end silent install (`--quiet --install`),
+    Start Menu shortcut / `HKCU` uninstall registry verification, and silent
+    uninstall (`--uninstall --quiet --remove-data`). Interactive UAC/all-users
+    `Program Files` install, Mica composition on desktop, interactive
+    in-app updater restart, and manual Windows 11 / macOS GUI QA remain open.
 
 - macOS uses compact list/map thumbnails and a separate larger inspector
   preview cache, with decoded-byte and count limits. Duplicate Quick Look
@@ -403,38 +401,38 @@ no separate login, use the existing Git credential helper to supply
 Read access to the current release and repository push permission were
 verified with this setup on 2026-11-25.
 
-Current public version: **0.9.2** (`v0.9.2`, commit
-`5ff3bf2d3a866d7b1584e3187971bd86471e8816`). The release page is:
-<https://github.com/jaisinghdhaliwal/joonga-tag/releases/tag/v0.9.2>
+Current public version: **0.9.3** (`v0.9.3`, commit
+`a9c4c858145eae0cfba6258e0a6c8e2b3c2f0f62`). The release page is:
+<https://github.com/jaisinghdhaliwal/joonga-tag/releases/tag/v0.9.3>
 
 Published assets for that release (all built from commit
-`5ff3bf2d3a866d7b1584e3187971bd86471e8816`):
+`a9c4c858145eae0cfba6258e0a6c8e2b3c2f0f62`):
 
-- `Joonga-Metadata-0.9.2-Windows-x64-Setup.exe`: self-contained Windows 11
-  x64 Fluent Setup wizard from CI run `45746628207` (installer `--smoke-test`
+- `Joonga-Tag-0.9.3-Windows-x64-Setup.exe`: self-contained Windows 11
+  x64 Fluent Setup wizard from CI run `45806456690` (installer `--smoke-test`
   and silent install/uninstall verification passed on CI).
-- `Joonga-Metadata-0.9.2-Windows-arm64-Setup.exe`: self-contained Windows 11
-  ARM64 Fluent Setup wizard from CI run `45746628207`.
-- `Joonga-Metadata-0.9.2-Windows-x64.zip`: self-contained Windows 11 x64
-  portable build from CI run `45746628207` (core tests + `--smoke-test` UI
+- `Joonga-Tag-0.9.3-Windows-arm64-Setup.exe`: self-contained Windows 11
+  ARM64 Fluent Setup wizard from CI run `45806456690`.
+- `Joonga-Tag-0.9.3-Windows-x64.zip`: self-contained Windows 11 x64
+  portable build from CI run `45806456690` (core tests + `--smoke-test` UI
   check passed on CI).
-- `Joonga-Metadata-0.9.2-Windows-arm64.zip`: self-contained Windows 11 ARM64
-  portable build from CI run `45746628207` (core tests passed on CI).
-- `Joonga-Metadata-0.9.2-macOS.dmg`: universal (`arm64` + `x86_64`)
-  drag-to-install DMG containing `Joonga Metadata.app` plus an Applications
+- `Joonga-Tag-0.9.3-Windows-arm64.zip`: self-contained Windows 11 ARM64
+  portable build from CI run `45806456690` (core tests passed on CI).
+- `Joonga-Tag-0.9.3-macOS.dmg`: universal (`arm64` + `x86_64`)
+  drag-to-install DMG containing `Joonga Tag.app` plus an Applications
   shortcut.
-- `Joonga-Metadata-0.9.2-macOS.zip`: universal (`arm64` + `x86_64`) portable
+- `Joonga-Tag-0.9.3-macOS.zip`: universal (`arm64` + `x86_64`) portable
   app bundle archive.
 - `SHA256SUMS.txt`: SHA-256 checksums for all release archives.
 
-Validation status for `v0.9.2`: macOS `bash macos/build.command`, `Assets.car`,
+Validation status for `v0.9.3`: macOS `bash macos/build.command`, `Assets.car`,
 bundled ExifTool `13.64`, `lipo -archs` (`x86_64` + `arm64`), strict
-`codesign`, `CFBundleShortVersionString` `0.9.2`, DMG mount/contents/codesign
+`codesign`, `CFBundleShortVersionString` `0.9.3`, DMG mount/contents/codesign
 check via `hdiutil attach`, and `shasum -a 256 -c SHA256SUMS.txt` all passed,
-along with macOS (`45746628234`) and Windows (`45746628207`) CI workflows.
+along with macOS (`45806456702`) and Windows (`45806456690`) CI workflows.
 Interactive macOS GUI visual QA and manual Windows 11 desktop QA (including
-interactive UAC `Program Files` install/uninstall, Mica, Shell thumbnails,
-and WebView2) remain open.
+interactive UAC `Program Files` install/uninstall, interactive updater
+restart, Mica, Shell thumbnails, and WebView2) remain open.
 
 The repository CI produces portable Windows ZIPs, Windows `Setup.exe`
 installers, and the macOS portable ZIP; DMG packaging and GitHub Release
