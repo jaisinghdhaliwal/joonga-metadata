@@ -95,7 +95,7 @@ internal sealed class UninstallWindow : Window
 
         removeUserData = new CheckBox
         {
-            Content = "Also remove saved workflows and app settings",
+            Content = "Also remove saved presets and app settings",
             IsChecked = fromSettings,
             IsEnabled = !fromSettings
         };

@@ -332,14 +332,14 @@ struct SettingsView: View {
                             .buttonStyle(.bordered).tint(.primary)
                         }
                     }
-                    LabeledContent("Workflows") {
+                    LabeledContent("Presets") {
                         Button("Open Library Folder") { library.openWorkflowDirectory() }
                     }
                 }
                 Section("Uninstall") {
                     Button("Uninstall Joonga Tag…", role: .destructive) { confirmingUninstall = true }
                         .disabled(library.busy || library.mediaLoading || !library.pendingPaths.isEmpty)
-                    Text("Removes this copy of the app, settings, workflows, and caches.")
+                    Text("Removes this copy of the app, settings, presets, and caches.")
                         .font(.caption).foregroundStyle(.secondary)
                     if let uninstallError { Text(uninstallError).foregroundStyle(.secondary) }
                 }
@@ -367,7 +367,7 @@ struct SettingsView: View {
                 catch { uninstallError = error.localizedDescription }
             }
         } message: {
-            Text("This removes Joonga Tag’s settings and workflows. Photos, videos, exports, and separately installed software are kept.")
+            Text("This removes Joonga Tag’s settings and presets. Photos, videos, exports, and separately installed software are kept.")
         }
     }
 }

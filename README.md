@@ -13,7 +13,7 @@
 Get the latest builds from [GitHub Releases](https://github.com/jaisinghdhaliwal/joonga-tag/releases).
 
 Joonga Tag was previously called Joonga Metadata. On first launch it copies
-existing settings and workflows into the new app’s storage. **About Joonga Tag**
+existing settings and presets into the new app’s storage. **About Joonga Tag**
 can check GitHub for newer releases and install verified updates.
 
 | macOS | Windows |
@@ -24,17 +24,17 @@ can check GitHub for newer releases and install verified updates.
 
 ## Features
 
-- **Metadata** sorts photos and videos, previews the selection in a collapsible inspector, groups tags for editing, and applies reusable workflows. Both apps use ExifTool and share a portable workflow format.
+- **Metadata** sorts photos and videos, previews the selection in a collapsible inspector, groups tags for editing, and applies reusable presets. Both apps use ExifTool and share a portable preset format.
 - **Map** plots saved and pending GPS coordinates. Search for a place, pick a point, or reuse a favourite or copied location. Switch between Normal, Hybrid, and Satellite views or show only selected files.
 - **Transfer** matches originals to exports and copies writable metadata, including across file extensions and HDR filename variants.
 
-Metadata and Map share a resizable file pane and selection, with separate column layouts. Manual edits, workflow assignments, and map changes stay pending across files and modes until you choose **Save Changes**. ExifTool keeps backups when writing files.
+Metadata and Map share a resizable file pane and selection, with separate column layouts. Manual edits, preset assignments, and map changes stay pending across files and modes until you choose **Save Changes**. ExifTool keeps backups when writing files.
 
 ## How it works
 
 1. Drop original and exported files or folders into their respective panes. The app matches filenames across extensions and recognises HDR suffixes. Click a pane’s folder icon to open its location in Finder or Explorer.
 2. Select files to inspect metadata differences or enter new values in the preview pane.
-3. Copy metadata to matched exports or apply a saved workflow. ExifTool keeps backups beside modified files.
+3. Copy metadata to matched exports or apply a saved preset. ExifTool keeps backups beside modified files.
 
 ## Build from source
 

@@ -124,7 +124,7 @@ public sealed partial class MainWindow : Window
         folderCommands.Children.Add(UI.IconButton("\uE8DE", "Choose exports folder", () => Choose(exports), "Ctrl+Shift+O"));
 
         var separator = new Border { Width = 1, Height = 18, Background = UI.Subtle, Margin = new Thickness(7, 0, 7, 0) };
-        var workflows = UI.IconButton("\uEF90", "Workflows");
+        var workflows = UI.IconButton("\uEF90", "Presets");
         workflows.Content = UI.Horizontal(UI.Glyph("\uEF90"), new TextBlock
         {
             Text = "\uE70D",
@@ -160,9 +160,9 @@ public sealed partial class MainWindow : Window
     private void ShowWorkflowMenu(Button button)
     {
         var menu = new ContextMenu();
-        AddAction(menu, "Manage workflows…", () => OpenWorkflows(), !busy);
-        AddAction(menu, "New workflow", () => OpenWorkflows(true), !busy, "Ctrl+N");
-        AddAction(menu, "Open workflow library folder", OpenWorkflowLibrary);
+        AddAction(menu, "Manage presets…", () => OpenWorkflows(), !busy);
+        AddAction(menu, "New preset", () => OpenWorkflows(true), !busy, "Ctrl+N");
+        AddAction(menu, "Open preset library folder", OpenWorkflowLibrary);
         PopulateSavedWorkflows(menu);
         OpenPopup(button, menu);
     }
@@ -533,19 +533,19 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception error)
         {
-            menu.Items.Add(new MenuItem { Header = "Could not load saved workflows", IsEnabled = false });
-            status.Text = "Could not load workflows: " + error.Message;
+            menu.Items.Add(new MenuItem { Header = "Could not load saved presets", IsEnabled = false });
+            status.Text = "Could not load presets: " + error.Message;
             return;
         }
         if (saved.Length == 0)
         {
-            menu.Items.Add(new MenuItem { Header = "No saved workflows", IsEnabled = false });
+            menu.Items.Add(new MenuItem { Header = "No saved presets", IsEnabled = false });
             return;
         }
 
         var targetCount = SelectedPaths.Length;
         if (targetCount == 0)
-            menu.Items.Add(new MenuItem { Header = "Select files to apply a workflow", IsEnabled = false });
+            menu.Items.Add(new MenuItem { Header = "Select files to apply a preset", IsEnabled = false });
         foreach (var workflow in saved)
         {
             var menuItem = new MenuItem
@@ -567,7 +567,7 @@ public sealed partial class MainWindow : Window
                 if(!workflowDrafts.TryGetValue(path,out var pending))workflowDrafts[path]=pending=[];
                 pending.AddRange(operations);
             }
-            status.Text=$"Workflow staged for {paths.Length} files";
+            status.Text=$"Preset staged for {paths.Length} files";
             UpdatePending();
         }
         return Task.CompletedTask;
@@ -583,6 +583,6 @@ public sealed partial class MainWindow : Window
             window.ApplyRequested += async (args, paths) => await ApplyWorkflow(args, paths);
             window.ShowDialog();
         }
-        catch(Exception e){UI.Results(this,"Workflow library could not be opened",e.Message+"\n\nYour existing library has not been changed.");}
+        catch(Exception e){UI.Results(this,"Preset library could not be opened",e.Message+"\n\nYour existing library has not been changed.");}
     }
 }

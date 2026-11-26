@@ -334,7 +334,7 @@ struct MediaTable: NSViewRepresentable {
             for (title, action) in [
                 ("Quick Look", #selector(previewSelection)),
                 ("Reveal in Finder", #selector(revealSelection)),
-                ("Stage Workflow…", #selector(stageWorkflow)),
+                ("Stage Preset…", #selector(stageWorkflow)),
             ] {
                 let item = menu.addItem(withTitle: title, action: action, keyEquivalent: "")
                 item.target = self

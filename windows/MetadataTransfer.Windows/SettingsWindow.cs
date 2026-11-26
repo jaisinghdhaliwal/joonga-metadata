@@ -113,7 +113,7 @@ internal sealed class SettingsWindow : Window
         UpdateExifTool();
         AddSection("Tools and data", UI.Muted("ExifTool executable"), exifPath,
             UI.Horizontal(chooseTool, applyTool, automaticTool), toolStatus,
-            UI.Horizontal(UI.Button("Open Workflow Library Folder", openWorkflowLibrary)));
+            UI.Horizontal(UI.Button("Open Preset Library Folder", openWorkflowLibrary)));
 
         var uninstall = UI.Button("Uninstall Joonga Tag…", () =>
         {
@@ -125,7 +125,7 @@ internal sealed class SettingsWindow : Window
             UninstallRequested = true;
             Close();
         });
-        AddSection("Uninstall", UI.Muted("Remove this app, workflows, settings, and caches."), UI.Horizontal(uninstall));
+        AddSection("Uninstall", UI.Muted("Remove this app, presets, settings, and caches."), UI.Horizontal(uninstall));
         layout.Children.Add(new ScrollViewer { Content = sections, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
         Content = layout;
     }

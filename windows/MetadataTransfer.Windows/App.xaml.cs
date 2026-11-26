@@ -32,7 +32,7 @@ public partial class App : Application
             try { Settings.MigrateLegacyData(); }
             catch (Exception error) when (error is System.IO.IOException or UnauthorizedAccessException)
             {
-                UI.Dialog(null, error.Message, "Could not copy previous settings or workflows");
+                UI.Dialog(null, error.Message, "Could not copy previous settings or presets");
             }
         }
         var window=new MainWindow(smoke);MainWindow=window;

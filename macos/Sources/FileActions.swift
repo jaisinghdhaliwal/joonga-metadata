@@ -124,7 +124,7 @@ struct FileContextMenu: View {
                 library.stageLocation(point, targets: targets)
             }
         }.disabled(targets.isEmpty || library.busy || library.exif == nil)
-        Button("Apply Workflow…") {
+        Button("Apply Preset…") {
             let ids = originals ? library.originalSelection : library.exportSelection
             if !ids.contains(id) || library.activeOriginals != originals { library.updateSelection([id], originals: originals) }
             library.showWorkflows = true

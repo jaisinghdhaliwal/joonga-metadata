@@ -37,8 +37,8 @@ public sealed class WorkflowStore(string path)
         if (doc.RootElement.ValueKind == JsonValueKind.Array) items = JsonSerializer.Deserialize<Workflow[]>(text, Json) ?? [];
         else
         {
-            var archive = JsonSerializer.Deserialize<WorkflowArchive>(text, Json) ?? throw new InvalidDataException("Empty workflow library.");
-            if (archive.Format != "MetadataTransferWorkflows" || archive.Version != 1) throw new InvalidDataException("Unsupported workflow format/version.");
+            var archive = JsonSerializer.Deserialize<WorkflowArchive>(text, Json) ?? throw new InvalidDataException("Empty preset library.");
+            if (archive.Format != "MetadataTransferWorkflows" || archive.Version != 1) throw new InvalidDataException("Unsupported preset format/version.");
             items = archive.Presets ?? throw new InvalidDataException("Missing presets.");
         }
         foreach (var w in items) WorkflowRules.Validate(w);

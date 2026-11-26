@@ -64,7 +64,7 @@ changes; do not stop at a technically functional layout.
 ## Product rules
 
 - Preserve media encoding. Metadata work uses ExifTool, not a transcoder.
-- Stage inspector edits, workflows and map changes in memory. Do not write
+- Stage inspector edits, presets and map changes in memory. Do not write
   media until **Save Changes** is chosen.
 - ExifTool keeps backups. Surface per-file success, warnings and failure;
   retain failed pending drafts for review.
@@ -75,9 +75,10 @@ changes; do not stop at a technically functional layout.
   state. Do not duplicate Make/Model fields per selected file.
 - Clearly distinguish editable, calculated and read-only metadata. Absent
   writable tags must remain editable.
-- Workflows are portable, versioned JSON user data. Their editor remains one
-  large ExifTool-operation text field (one operation per line); do not ship
-  personal presets in source or the app.
+- Presets are portable, versioned JSON user data (stored in `Workflows.json`
+  with the `MetadataTransferWorkflows` archive format for compatibility).
+  Their editor remains one large ExifTool-operation text field (one operation
+  per line); do not ship personal presets in source or the app.
 - Full source/destination paths must be discoverable in headers/tooltips and
   pane folder icons must open/select their locations.
 - Quick Look/quick preview remains available from Space and the context menu.
@@ -222,6 +223,13 @@ inspired by Apple Photos.
 | Windows ARM64 | `.\\windows\\Build.ps1 -Runtime win-arm64` | Same core checks; confirm native visual/runtime behaviour on ARM hardware. |
 
 ### Current state (2026-11-26)
+
+- Renamed user-facing "Workflow" / "Workflows" UI strings, menus, dialogs,
+  and documentation to "Preset" / "Presets" across macOS and Windows while
+  preserving `Workflows.json` storage paths and the `MetadataTransferWorkflows`
+  JSON archive format for backwards compatibility. Local `bash macos/build.command`
+  succeeded (`Assets.car`, ExifTool `13.64`, `x86_64` + `arm64`, strict
+  `codesign`); Windows compilation/smoke CI runs on push.
 
 - Right-clicking the workspace map opens a save-to-favourites action in both
   apps. Saving uses the clicked coordinate without staging file edits.

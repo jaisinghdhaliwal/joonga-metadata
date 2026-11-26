@@ -931,7 +931,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
    }
    return item
   }
-  let values:[String:(String,String,Selector)] = ["workflows":("Workflows","slider.horizontal.3",#selector(workflows)),"originals":("Add Files or Open Originals","plus",#selector(openOriginals)),"clear":("Clear Files","trash",#selector(clearFiles)),"exports":("Open Exports Folder","folder.badge.gearshape",#selector(openExports)),"refresh":("Refresh","arrow.clockwise",#selector(refresh)),"inspector":("Toggle Inspector","sidebar.right",#selector(inspector))]
+  let values:[String:(String,String,Selector)] = ["workflows":("Presets","slider.horizontal.3",#selector(workflows)),"originals":("Add Files or Open Originals","plus",#selector(openOriginals)),"clear":("Clear Files","trash",#selector(clearFiles)),"exports":("Open Exports Folder","folder.badge.gearshape",#selector(openExports)),"refresh":("Refresh","arrow.clockwise",#selector(refresh)),"inspector":("Toggle Inspector","sidebar.right",#selector(inspector))]
   guard let (label,icon,action)=values[id.rawValue] else{return nil}
   let item=NSToolbarItem(itemIdentifier:id)
   item.label=label; item.toolTip=label; item.image=NSImage(systemSymbolName:icon,accessibilityDescription:label)
@@ -997,10 +997,10 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
   file.addItem(.separator())
   file.addItem(withTitle:"Close Window",action:#selector(NSWindow.performClose(_:)),keyEquivalent:"w")
 
-  let workflow = addMenu("Workflows")
-  command(workflow, "Manage Workflows…", #selector(workflows))
-  command(workflow, "New Workflow", #selector(newWorkflow), key: "n")
-  command(workflow, "Open Workflow Library Folder", #selector(openWorkflowLibrary))
+  let workflow = addMenu("Presets")
+  command(workflow, "Manage Presets…", #selector(workflows))
+  command(workflow, "New Preset", #selector(newWorkflow), key: "n")
+  command(workflow, "Open Preset Library Folder", #selector(openWorkflowLibrary))
   workflowMenu = workflow
   workflowCommandCount = workflow.numberOfItems
   workflow.delegate = self
@@ -1107,13 +1107,13 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
   }
   menu.addItem(.separator())
   if library.presets.isEmpty {
-   let empty = NSMenuItem(title: "No Saved Workflows", action: nil, keyEquivalent: "")
+   let empty = NSMenuItem(title: "No Saved Presets", action: nil, keyEquivalent: "")
    empty.isEnabled = false
    menu.addItem(empty)
    return
   }
   if library.selectedTargets.isEmpty {
-   let hint = NSMenuItem(title: "Select Files to Apply a Workflow", action: nil, keyEquivalent: "")
+   let hint = NSMenuItem(title: "Select Files to Apply a Preset", action: nil, keyEquivalent: "")
    hint.isEnabled = false
    menu.addItem(hint)
   }
@@ -1155,7 +1155,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
   case #selector(pasteLocation): return workspaceAvailable && library.exif != nil && !library.selectedTargets.isEmpty
   case #selector(applySavedWorkflow(_:)): return canApplySavedWorkflow
   case #selector(saveChanges):
-   item.title = library.showWorkflows ? "Save Workflow" : "Save Metadata Changes"
+   item.title = library.showWorkflows ? "Save Preset" : "Save Metadata Changes"
    return library.showWorkflows || (workspaceAvailable && !library.pendingPaths.isEmpty && library.exif != nil)
   case #selector(quickLook): return workspaceAvailable && !library.selectedTargets.isEmpty
   case #selector(previous): return workspaceAvailable && library.navigationTarget(-1) != nil

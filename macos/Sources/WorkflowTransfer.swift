@@ -21,7 +21,7 @@ struct WorkflowArchive: Codable {
         } else {
             let archive = try decoder.decode(WorkflowArchive.self, from: data)
             guard archive.format == "MetadataTransferWorkflows", archive.version == 1 else {
-                throw TransferError.invalid("This workflow file uses an unsupported format or version.")
+                throw TransferError.invalid("This preset file uses an unsupported format or version.")
             }
             presets = archive.presets
         }
@@ -31,7 +31,7 @@ struct WorkflowArchive: Codable {
                   preset.operations.allSatisfy({
                       $0.range(of: "^-[A-Za-z][A-Za-z0-9:#-]*(=|<|>)", options: .regularExpression) != nil && !$0.contains("\n")
                   }) else {
-                throw TransferError.invalid("The workflow “\(preset.name)” contains invalid metadata operations.")
+                throw TransferError.invalid("The preset “\(preset.name)” contains invalid metadata operations.")
             }
         }
         return presets
@@ -66,31 +66,31 @@ extension Library {
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = true
         panel.allowedContentTypes = [.json]
-        panel.prompt = "Import Workflows"
+        panel.prompt = "Import Presets"
         guard panel.runModal() == .OK else { return "" }
         do {
             // Validate every selected file before changing the library.
             let incoming = try panel.urls.flatMap { try WorkflowArchive.decode(Data(contentsOf: $0)) }
             let added = mergePresets(incoming)
-            guard added >= 0 else { return "Import could not be saved. Check the workflow library folder permissions." }
-            return "Imported \(added) workflows. Skipped \(incoming.count - added) duplicates."
+            guard added >= 0 else { return "Import could not be saved. Check the preset library folder permissions." }
+            return "Imported \(added) presets. Skipped \(incoming.count - added) duplicates."
         } catch {
             return "Import failed. \(error.localizedDescription)"
         }
     }
 
     func exportWorkflows(_ workflows: [Preset]) -> String {
-        guard !workflows.isEmpty else { return "Select workflows to export." }
+        guard !workflows.isEmpty else { return "Select presets to export." }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = workflows.count == 1 ? "Workflow.json" : "Workflow Library.json"
-        panel.prompt = "Export Workflows"
+        panel.nameFieldStringValue = workflows.count == 1 ? "Preset.json" : "Preset Library.json"
+        panel.prompt = "Export Presets"
         guard panel.runModal() == .OK, let url = panel.url else { return "" }
         do {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             try encoder.encode(WorkflowArchive(presets: workflows)).write(to: url, options: .atomic)
-            return "Exported \(workflows.count) workflows."
+            return "Exported \(workflows.count) presets."
         } catch {
             return "Export failed. \(error.localizedDescription)"
         }

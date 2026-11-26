@@ -7,7 +7,7 @@ A native Windows metadata editor and transfer utility, built with C#, .NET 10 WP
 **Installer (recommended):**
 1. Choose **Joonga-Tag-*-Windows-x64-Setup.exe** for Intel/AMD PCs, or **Joonga-Tag-*-Windows-arm64-Setup.exe** for Windows on ARM.
 2. Run the Windows 11 Setup wizard to install to `Program Files\Joonga Tag` (all users), `%LocalAppData%\Programs\Joonga Tag` (current user), or a custom folder you choose, with optional Start Menu and Desktop shortcuts.
-3. Use **Settings → Uninstall Joonga Tag…** in the app to remove it, including settings, workflows, and caches. Windows **Installed apps** also opens the uninstaller and offers a choice to keep personal data.
+3. Use **Settings → Uninstall Joonga Tag…** in the app to remove it, including settings, presets, and caches. Windows **Installed apps** also opens the uninstaller and offers a choice to keep personal data.
 
 **Portable ZIP:**
 1. Choose the **win-x64** ZIP for Intel/AMD PCs, or **win-arm64** for Windows on ARM.
@@ -38,40 +38,40 @@ Names match without extensions, case-insensitively. A trailing `-HDR` may match 
 - Make and Model merge across EXIF/XMP/QuickTime aliases; writes synchronize existing aliases and are read back for verification. Lens ID, Aperture and Shutter Speed route to Lens Model, F Number and Exposure Time. Other computed fields are labelled read-only.
 - Add any other writable ExifTool tag with **Add another tag**.
 - Space or double-click opens Quick preview; Space/Escape closes it. Arrow keys navigate a multi-file selection. Video playback uses Windows codecs and provides Open externally when unsupported.
-- Right-click for preview, Open, Show in Explorer, Copy paths or Apply workflow.
+- Right-click for preview, Open, Show in Explorer, Copy paths or Apply preset.
 - **Map** plots saved and staged GPS and groups nearby photo pins with a count badge. Open a group to zoom in, select one file, or select every member. Select files before clicking a point or choosing a search result to stage coordinates. Use the toolbar **Favourites** button and the file context menu’s **Copy location** and **Paste location** commands (Ctrl+Shift+C/V) to reuse locations. Use **Map options** to fit or filter pins and switch between Normal (OpenStreetMap), Hybrid and Satellite (Esri). Tiles and Photon search require internet access and the map requires Edge WebView2. **Save changes** writes staged edits across modes.
 
 Shell thumbnails use Windows' installed codecs. AVIF/HEIF/RAW and less common video formats may need Windows codec extensions to display thumbnails or play in the preview; this does not prevent ExifTool from reading/writing supported metadata.
 
-## Workflows and settings
+## Presets and settings
 
-Select files in either pane, click the **Workflows** icon in the toolbar, and choose a saved workflow to stage it for that selection. The list refreshes whenever you open the menu. Use **Manage Workflows** to edit presets or choose a different target scope.
+Select files in either pane, click the **Presets** icon in the toolbar, and choose a saved preset to stage it for that selection. The list refreshes whenever you open the menu. Use **Manage presets** to edit presets or choose a different target scope.
 
-Joonga Tag copies settings and workflows from the old `Metadata Transfer` folders when the corresponding new file is missing. After verifying the data in Joonga Tag, you can remove the legacy files. Workflows use the same versioned JSON archive as the Mac application. Import/export individual workflows, multiple selected workflows, entire libraries or several JSON files together. Import validates every input before saving and preserves operation order. Personal presets are kept in your profile.
+Joonga Tag copies settings and presets from the old `Metadata Transfer` folders when the corresponding new file is missing. After verifying the data in Joonga Tag, you can remove the legacy files. Presets use the same versioned JSON archive as the Mac application. Import/export individual presets, multiple selected presets, entire libraries or several JSON files together. Import validates every input before saving and preserves operation order. Personal presets are kept in your profile.
 
-**New**, **Duplicate**, **Delete** and **Save workflow** manage presets. The editor is one large text box: one `-Tag=Value` or `-Destination<Source` operation per line, with no shell quoting. Standard Ctrl+C/V/X/A/Z/Y shortcuts work. Invalid lines are identified before applying. Unsaved workflow changes prompt Save/Discard/Cancel when leaving the editor. Targets default to the active file selection; all-originals/all-exports scopes are also available.
+**New**, **Duplicate**, **Delete** and **Save preset** manage presets. The editor is one large text box: one `-Tag=Value` or `-Destination<Source` operation per line, with no shell quoting. Standard Ctrl+C/V/X/A/Z/Y shortcuts work. Invalid lines are identified before applying. Unsaved preset changes prompt Save/Discard/Cancel when leaving the editor. Targets default to the active file selection; all-originals/all-exports scopes are also available.
 
-- Workflows: `%APPDATA%\Joonga Tag\Workflows.json`
+- Presets: `%APPDATA%\Joonga Tag\Workflows.json`
 - Preferences: `%APPDATA%\Joonga Tag\Settings.json`
 - Map browser cache: `%LOCALAPPDATA%\Joonga Tag\WebView2`
 
 Existing settings in `%LOCALAPPDATA%\Joonga Tag\Settings.json` take
 precedence over older Metadata Transfer settings during migration.
 
-Open the **Settings** gear or press Ctrl+comma to choose or clear the default exports folder, show or hide the preview, open the workflow library, and configure ExifTool. The default exports folder is used on the next launch. You can also save the current export folder from its pane menu. If you configure another ExifTool installation, rename `exiftool(-k).exe` to `exiftool.exe`, and keep its full `exiftool_files` folder alongside it. Closing the main window exits the app. Pending writes must finish (or be cancelled between files); unsaved edits prompt before exit.
+Open the **Settings** gear or press Ctrl+comma to choose or clear the default exports folder, show or hide the preview, open the preset library, and configure ExifTool. The default exports folder is used on the next launch. You can also save the current export folder from its pane menu. If you configure another ExifTool installation, rename `exiftool(-k).exe` to `exiftool.exe`, and keep its full `exiftool_files` folder alongside it. Closing the main window exits the app. Pending writes must finish (or be cancelled between files); unsaved edits prompt before exit.
 
 ## Shortcuts
 
 | Shortcut | Action |
 | --- | --- |
-| Ctrl+N | New workflow |
-| Ctrl+S | Save metadata / save workflow when its window is active |
+| Ctrl+N | New preset |
+| Ctrl+S | Save metadata / save preset when its window is active |
 | Ctrl+I | Show/hide inspector |
 | F5 | Refresh comparison |
 | Ctrl+Alt+[ or Ctrl+Alt+] | Previous or next file in the active pane |
 | Space | Open/close quick preview from file lists |
 | Ctrl/Shift-click, Ctrl+A | Extended file selection |
-| Delete in workflow list | Delete selected workflows |
+| Delete in preset list | Delete selected presets |
 
 ## Build and test
 
@@ -91,14 +91,14 @@ To run just the portable engine tests:
 dotnet run --project windows/MetadataTransfer.Tests -- C:\path\to\exiftool.exe
 ```
 
-For a native UI startup/layout smoke test, run the built app with `--smoke-test`. It uses isolated settings and synthetic files and writes PNGs/logs under `SmokeResults` next to the executable. It never loads your workflow library or modifies your media.
+For a native UI startup/layout smoke test, run the built app with `--smoke-test`. It uses isolated settings and synthetic files and writes PNGs/logs under `SmokeResults` next to the executable. It never loads your preset library or modifies your media.
 
 ## Validation status
 
-The source has been cross-compiled on macOS for Windows. Portable engine checks cover matching, workflow compatibility/persistence, mixed and missing batch fields, calculated-tag routing, actual JPEG/MP4 writes/copies, camera read-back verification, backup retention, literal process arguments and modification-time preservation.
+The source has been cross-compiled on macOS for Windows. Portable engine checks cover matching, preset compatibility/persistence, mixed and missing batch fields, calculated-tag routing, actual JPEG/MP4 writes/copies, camera read-back verification, backup retention, literal process arguments and modification-time preservation.
 
 **This build has not been run on Windows in the current development session.** Mica rendering, Shell thumbnails, Windows video decoding, map runtime integration, Windows file dialogs, DPI scaling and keyboard/mouse interaction require the supplied Windows smoke test and manual checklist in `WINDOWS-QA.md`. A clean cross-build is not a claim of completed Windows visual QA.
 
 ## Source layout
 
-In [windows](../../windows), `MetadataTransfer.Core` contains platform-independent matching, metadata, ExifTool and workflow storage. `MetadataTransfer.Windows` contains the native UI, uninstaller and OS integration. `MetadataTransfer.Installer` builds the self-contained Windows 11 Setup executable. `MetadataTransfer.Tests` contains a dependency-free regression runner and synthetic fixtures. Build output and personal libraries are excluded from the source ZIP and `.gitignore`.
+In [windows](../../windows), `MetadataTransfer.Core` contains platform-independent matching, metadata, ExifTool and preset storage. `MetadataTransfer.Windows` contains the native UI, uninstaller and OS integration. `MetadataTransfer.Installer` builds the self-contained Windows 11 Setup executable. `MetadataTransfer.Tests` contains a dependency-free regression runner and synthetic fixtures. Build output and personal libraries are excluded from the source ZIP and `.gitignore`.

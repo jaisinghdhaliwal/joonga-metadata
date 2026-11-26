@@ -73,7 +73,7 @@ extension Library {
             return
         }
         for url in urls { workflowDrafts[url.path, default: []].append(contentsOf: operations) }
-        message = "Workflow staged for \(urls.count) \(urls.count == 1 ? "file" : "files")"
+        message = "Preset staged for \(urls.count) \(urls.count == 1 ? "file" : "files")"
         completion()
     }
 
@@ -90,7 +90,7 @@ extension Library {
                 _ = persistPresets(migrated)
             }
         } catch {
-            message = "Could not load workflows. " + error.localizedDescription
+            message = "Could not load presets. " + error.localizedDescription
         }
     }
 
@@ -105,7 +105,7 @@ extension Library {
             presets = updated
             return true
         } catch {
-            report = "Could not save workflows. " + error.localizedDescription
+            report = "Could not save presets. " + error.localizedDescription
             return false
         }
     }
@@ -212,7 +212,7 @@ struct WorkflowView: View {
     private func resolveEdits() -> Bool {
         guard dirty else { return true }
         let alert = NSAlert()
-        alert.messageText = "Save changes to this workflow?"
+        alert.messageText = "Save changes to this preset?"
         alert.informativeText = "Your changes will be lost if you don’t save them."
         alert.addButton(withTitle: "Save")
         alert.addButton(withTitle: "Cancel")
@@ -236,14 +236,14 @@ struct WorkflowView: View {
     }
     @discardableResult private func saveWorkflow() -> Bool {
         guard canSave else {
-            transferStatus = validation ?? "Give this workflow a name and at least one metadata assignment."
+            transferStatus = validation ?? "Give this preset a name and at least one metadata assignment."
             return false
         }
         let id = selectedPreset?.id ?? "personal-" + UUID().uuidString
         let preset = Preset(id: id, name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-                            category: selectedPreset?.category ?? "My Workflows", operations: arguments)
-        guard library.savePreset(preset) else { transferStatus = "Could not save the workflow."; return false }
-        selectedIDs = [id]; name = preset.name; creating = false; transferStatus = "Workflow saved."
+                            category: selectedPreset?.category ?? "My Presets", operations: arguments)
+        guard library.savePreset(preset) else { transferStatus = "Could not save the preset."; return false }
+        selectedIDs = [id]; name = preset.name; creating = false; transferStatus = "Preset saved."
         return true
     }
     private func duplicateWorkflow() {
@@ -254,7 +254,7 @@ struct WorkflowView: View {
     }
     private func deleteSelection() {
         if library.deletePresets(selectedIDs) {
-            selectedIDs = []; creating = false; name = ""; operations = ""; transferStatus = "Workflows deleted."
+            selectedIDs = []; creating = false; name = ""; operations = ""; transferStatus = "Presets deleted."
         }
     }
     var targets: [URL] {
@@ -272,11 +272,11 @@ struct WorkflowView: View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 Image(systemName: "slider.horizontal.3").foregroundStyle(.secondary)
-                Text("Workflows").font(.system(size: 14, weight: .semibold))
+                Text("Presets").font(.system(size: 14, weight: .semibold))
                 Spacer()
                 Button("Import…") { transferStatus = library.importWorkflows() }
                 Menu("Export") {
-                    Button("Selected Workflows (\(selectedIDs.count))…") {
+                    Button("Selected Presets (\(selectedIDs.count))…") {
                         transferStatus = library.exportWorkflows(library.presets.filter { selectedIDs.contains($0.id) })
                     }.disabled(selectedIDs.isEmpty)
                     Button("Entire Library…") { transferStatus = library.exportWorkflows(library.presets) }
@@ -289,7 +289,7 @@ struct WorkflowView: View {
                 VStack(spacing: 0) {
                     HStack(spacing: 6) {
                         Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                        TextField("Search workflows", text: $search).textFieldStyle(.plain)
+                        TextField("Search presets", text: $search).textFieldStyle(.plain)
                         if !search.isEmpty {
                             Button { search = "" } label: { Image(systemName: "xmark.circle.fill") }
                                 .buttonStyle(.plain).foregroundStyle(.secondary).help("Clear search")
@@ -308,16 +308,16 @@ struct WorkflowView: View {
                     }.listStyle(.sidebar)
                     .accentColor(accent.tint)
                     .tint(accent.tint)
-                    .overlay { if filteredPresets.isEmpty { Text(search.isEmpty ? "Your workflows appear here" : "No matching workflows").font(.caption).foregroundStyle(.secondary).allowsHitTesting(false) } }
+                    .overlay { if filteredPresets.isEmpty { Text(search.isEmpty ? "Your presets appear here" : "No matching presets").font(.caption).foregroundStyle(.secondary).allowsHitTesting(false) } }
                     .onDeleteCommand { if !selectedIDs.isEmpty { confirmingDelete = true } }
                     Divider()
                     HStack(spacing: 12) {
-                        Button(action: newWorkflow) { Label("New", systemImage: "plus") }.help("New Workflow · ⌘N")
+                        Button(action: newWorkflow) { Label("New", systemImage: "plus") }.help("New Preset · ⌘N")
                         Spacer()
                         Button(action: duplicateWorkflow) { Image(systemName: "plus.square.on.square") }
-                            .help("Duplicate Workflow").accessibilityLabel("Duplicate Workflow").disabled(selectedIDs.count != 1)
+                            .help("Duplicate Preset").accessibilityLabel("Duplicate Preset").disabled(selectedIDs.count != 1)
                         Button { confirmingDelete = true } label: { Image(systemName: "trash") }
-                            .help("Delete Workflow").accessibilityLabel("Delete Workflow").disabled(selectedIDs.isEmpty)
+                            .help("Delete Preset").accessibilityLabel("Delete Preset").disabled(selectedIDs.isEmpty)
                     }.buttonStyle(.borderless).tint(.primary).padding(12)
                 }.frame(width: 230).background(Vibrancy())
                 Divider()
@@ -326,11 +326,11 @@ struct WorkflowView: View {
                     VStack(spacing: 14) {
                         Image(systemName: selectedIDs.count > 1 ? "square.stack" : "slider.horizontal.3")
                             .font(.system(size: 36, weight: .ultraLight)).foregroundStyle(.secondary)
-                        Text(selectedIDs.count > 1 ? "\(selectedIDs.count) Workflows Selected" : "Your Metadata, One Workflow")
+                        Text(selectedIDs.count > 1 ? "\(selectedIDs.count) Presets Selected" : "Your Metadata, One Preset")
                             .font(.system(size: 17, weight: .semibold))
-                        Text(selectedIDs.count > 1 ? "Export your selection to use it on another Mac,\nor select one workflow to edit it." : "Save repeatable metadata edits, then apply them\nto the files you select.")
+                        Text(selectedIDs.count > 1 ? "Export your selection to use it on another Mac,\nor select one preset to edit it." : "Save repeatable metadata edits, then apply them\nto the files you select.")
                             .font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                        if selectedIDs.isEmpty { Button("New Workflow", action: newWorkflow).buttonStyle(.borderedProminent).tint(accent.tint) }
+                        if selectedIDs.isEmpty { Button("New Preset", action: newWorkflow).buttonStyle(.borderedProminent).tint(accent.tint) }
                     }
                     .padding(28)
                     .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -343,15 +343,15 @@ struct WorkflowView: View {
             Divider()
             HStack(spacing: 6) {
                 Image(systemName: transferStatus.isEmpty ? "internaldrive" : "info.circle")
-                Text(transferStatus.isEmpty ? "Saved on this Mac · Import and export to share workflows" : transferStatus).lineLimit(2)
+                Text(transferStatus.isEmpty ? "Saved on this Mac · Import and export to share presets" : transferStatus).lineLimit(2)
                 Spacer()
             }.font(.system(size: 10)).foregroundStyle(.secondary).padding(.horizontal, 16).frame(height: 34).background(.ultraThinMaterial)
         }.frame(width: 800, height: 610)
         .interactiveDismissDisabled(dirty)
-        .confirmationDialog("Delete \(selectedIDs.count) workflows?", isPresented: $confirmingDelete) {
-            Button("Delete Workflows", role: .destructive, action: deleteSelection)
+        .confirmationDialog("Delete \(selectedIDs.count) presets?", isPresented: $confirmingDelete) {
+            Button("Delete Presets", role: .destructive, action: deleteSelection)
             Button("Cancel", role: .cancel) {}
-        } message: { Text("Export a copy first if you want to keep these workflows.") }
+        } message: { Text("Export a copy first if you want to keep these presets.") }
         .onAppear { if library.requestNewWorkflow { newWorkflow() } }
         .onChange(of: library.requestNewWorkflow) { if $0 { newWorkflow() } }
         .onChange(of: library.saveWorkflowRequest) { _ in _ = saveWorkflow() }
@@ -359,11 +359,11 @@ struct WorkflowView: View {
     private var editor: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text(creating ? "NEW WORKFLOW" : "EDIT WORKFLOW").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                Text(creating ? "NEW PRESET" : "EDIT PRESET").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
                 Spacer()
                 if dirty { Text("Unsaved changes").font(.system(size: 10)).foregroundStyle(.secondary) }
             }
-            TextField("Workflow name", text: $name).font(.system(size: 18, weight: .semibold))
+            TextField("Preset name", text: $name).font(.system(size: 18, weight: .semibold))
                 .textFieldStyle(.roundedBorder).focused($focusName)
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
@@ -401,7 +401,7 @@ struct WorkflowView: View {
                 }.labelsHidden()
             }
             if targets.isEmpty {
-                Label("Select files in either pane before applying a workflow.", systemImage: "cursorarrow.click")
+                Label("Select files in either pane before applying a preset.", systemImage: "cursorarrow.click")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             } else {
                 DisclosureGroup("Review \(targets.count) target \(targets.count == 1 ? "file" : "files")") {
@@ -412,7 +412,7 @@ struct WorkflowView: View {
             }
             Divider()
             HStack {
-                Button("Save Workflow") { _ = saveWorkflow() }.disabled(!canSave || !dirty).help("Save Workflow · ⌘S")
+                Button("Save Preset") { _ = saveWorkflow() }.disabled(!canSave || !dirty).help("Save Preset · ⌘S")
                 Spacer()
                 Button(targets.count == 1 ? "Stage for 1 File" : "Stage for \(targets.count) Files") {
                     let args = arguments, urls = targets

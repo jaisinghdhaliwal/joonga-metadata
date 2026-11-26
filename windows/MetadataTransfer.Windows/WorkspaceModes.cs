@@ -189,7 +189,7 @@ public sealed partial class MainWindow
         quick.Click+=(_,_)=>Preview();
         var reveal=new MenuItem{Header="Show in Explorer"};
         reveal.Click+=(_,_)=>{if(SelectedPaths.FirstOrDefault() is string path)UI.Reveal(path);};
-        var workflow=new MenuItem{Header="Stage workflow…"};
+        var workflow=new MenuItem{Header="Stage preset…"};
         workflow.Click+=(_,_)=>OpenWorkflows();
         var open = new MenuItem{Header="Open file"};
         open.Click+=(_,_)=>{ if(SelectedPaths.FirstOrDefault() is string path) UI.Open(path); };

@@ -125,7 +125,7 @@ internal sealed class FilePane : DockPanel
         FileAction("Copy paths",()=>{if(SelectedPaths.Length>0)Clipboard.SetText(string.Join(Environment.NewLine,SelectedPaths));});
         FileAction("Copy location",()=>CopyLocationRequested?.Invoke());
         FileAction("Paste location",()=>PasteLocationRequested?.Invoke());
-        FileAction("Apply workflow…",()=>WorkflowRequested?.Invoke());List.ContextMenu=fileMenu;
+        FileAction("Apply preset…",()=>WorkflowRequested?.Invoke());List.ContextMenu=fileMenu;
         AllowDrop=true;
         DragOver+=(_,e)=>
         {

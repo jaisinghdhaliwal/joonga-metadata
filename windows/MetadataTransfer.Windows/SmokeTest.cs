@@ -27,9 +27,9 @@ internal static class SmokeTest
             await main.CheckMediaWorkspaceAsync(originals);
             await main.Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);
             Capture(main,"metadata.png");
-            var store=new WorkflowStore(Path.Combine(temp,"Workflows.json"));store.Save([new("test","Camera details","My Workflows",["-Make=Sony","-Model=ILCE-7C"])]);
+            var store=new WorkflowStore(Path.Combine(temp,"Workflows.json"));store.Save([new("test","Camera details","My Presets",["-Make=Sony","-Model=ILCE-7C"])]);
             var workflows=new WorkflowWindow(main,store,new(){{"Selected files",Directory.GetFiles(exports)}},true);workflows.Show();await workflows.Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);Capture(workflows,"workflows.png");workflows.Close();
-            File.WriteAllText(Path.Combine(Output,"passed.txt"),"Native Windows window startup, Fluent light/dark layout, synthetic media comparison, shared media table, collapsible inspector, file removal and workflow window rendered. Mica composition, splitter interaction, codecs and WebView2 integration still require manual QA.");
+            File.WriteAllText(Path.Combine(Output,"passed.txt"),"Native Windows window startup, Fluent light/dark layout, synthetic media comparison, shared media table, collapsible inspector, file removal and presets window rendered. Mica composition, splitter interaction, codecs and WebView2 integration still require manual QA.");
             Application.Current.Shutdown(0);
         }
         catch(Exception e){Failure(e);Application.Current.Shutdown(1);}

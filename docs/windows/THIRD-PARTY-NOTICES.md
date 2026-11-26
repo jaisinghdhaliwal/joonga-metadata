@@ -8,4 +8,4 @@
 - **Esri** supplies online satellite imagery and hybrid labels. The map displays attribution when either style is active. [World Imagery and reference layers](https://developers.arcgis.com/web-scene-specification/objects/baseMap/)
 - **Photon**: the Windows picker sends the submitted place name or address to Komoot’s public OpenStreetMap geocoder. [Photon project](https://github.com/komoot/photon)
 
-No personal workflow JSON, source media, or private settings are bundled. Synthetic test media contains only a solid colour.
+No personal preset JSON, source media, or private settings are bundled. Synthetic test media contains only a solid colour.
