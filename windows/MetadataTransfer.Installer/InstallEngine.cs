@@ -13,7 +13,9 @@ internal sealed record InstallOptions(
     bool CreateStartMenuShortcut,
     bool CreateDesktopShortcut,
     string? UserAppData = null,
-    string? UserDesktop = null);
+    string? UserDesktop = null,
+    bool Update = false,
+    bool Register = true);
 
 internal sealed record InstallProgress(double Fraction, string Status);
 
@@ -166,7 +168,8 @@ internal static class InstallEngine
         {
             ct.ThrowIfCancellationRequested();
             progress.Report(new InstallProgress(0.02, "Closing running Joonga Metadata windows…"));
-            CloseRunningApplication();
+            if (options.Update) WaitForApplicationExit(ct);
+            else CloseRunningApplication();
 
             ct.ThrowIfCancellationRequested();
             Directory.CreateDirectory(installDir);
@@ -179,6 +182,7 @@ internal static class InstallEngine
             long totalBytes = Math.Max(1, fileEntries.Sum(e => Math.Max(1, e.Length)));
             long writtenBytes = 0;
             string installPrefix = installDir + Path.DirectorySeparatorChar;
+            using var rollback = options.Update ? new UpdateRollback(installDir) : null;
 
             foreach (var entry in archive.Entries)
             {
@@ -202,6 +206,7 @@ internal static class InstallEngine
                 if (!string.IsNullOrWhiteSpace(parent))
                     Directory.CreateDirectory(parent);
 
+                rollback?.Save(destinationPath);
                 entry.ExtractToFile(destinationPath, overwrite: true);
                 writtenBytes += Math.Max(1, entry.Length);
 
@@ -250,7 +255,8 @@ internal static class InstallEngine
 
             ct.ThrowIfCancellationRequested();
             progress.Report(new InstallProgress(0.97, "Registering application with Windows…"));
-            WriteUninstallRegistryEntry(installDir, exePath, totalBytes, options.AllUsers);
+            if (options.Register) WriteUninstallRegistryEntry(installDir, exePath, totalBytes, options.AllUsers);
+            rollback?.Commit();
 
             progress.Report(new InstallProgress(1.0, "Installation complete."));
         }, ct);
@@ -314,6 +320,66 @@ internal static class InstallEngine
         key.SetValue("NoModify", 1, RegistryValueKind.DWord);
         key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
         key.SetValue("URLInfoAbout", InfoUrl, RegistryValueKind.String);
+    }
+
+    private static void WaitForApplicationExit(CancellationToken token)
+    {
+        var timer = Stopwatch.StartNew();
+        while (timer.Elapsed < TimeSpan.FromSeconds(30))
+        {
+            token.ThrowIfCancellationRequested();
+            var processes = Process.GetProcessesByName("Joonga Metadata");
+            if (processes.Length == 0) return;
+            foreach (var process in processes) process.Dispose();
+            token.WaitHandle.WaitOne(250);
+        }
+        throw new IOException("Close any remaining Joonga Metadata windows, then run the update again.");
+    }
+
+    private sealed class UpdateRollback(string installDirectory) : IDisposable
+    {
+        private readonly DirectoryInfo backup = Directory.CreateTempSubdirectory("JoongaPrevious-");
+        private readonly List<(string Destination, string? Backup)> files = [];
+        private bool committed;
+
+        public void Save(string destination)
+        {
+            string? previous = null;
+            if (File.Exists(destination))
+            {
+                previous = Path.Combine(backup.FullName, Path.GetRelativePath(installDirectory, destination));
+                Directory.CreateDirectory(Path.GetDirectoryName(previous)!);
+                File.Copy(destination, previous);
+            }
+            files.Add((destination, previous));
+        }
+
+        public void Commit() => committed = true;
+
+        public void Dispose()
+        {
+            if (!committed)
+            {
+                var failures = new List<Exception>();
+                for (int i = files.Count - 1; i >= 0; i--)
+                {
+                    var (destination, previous) = files[i];
+                    try
+                    {
+                        if (previous is null) File.Delete(destination);
+                        else File.Copy(previous, destination, overwrite: true);
+                    }
+                    catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                    {
+                        failures.Add(error);
+                    }
+                }
+                if (failures.Count != 0)
+                    throw new IOException($"Some files could not be restored. Backups are in {backup.FullName}.", failures[0]);
+            }
+            try { backup.Delete(recursive: true); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+        }
     }
 
     private static void CloseRunningApplication()

@@ -23,7 +23,7 @@ public partial class App : Application
         DispatcherUnhandledException += (_, args) =>
         {
             if(smoke){SmokeTest.Failure(args.Exception);Shutdown(1);}
-            else MessageBox.Show(args.Exception.Message,ProductName,MessageBoxButton.OK,MessageBoxImage.Error);
+            else UI.Dialog(Application.Current?.MainWindow, args.Exception.Message,ProductName,MessageBoxButton.OK,MessageBoxImage.Error);
             args.Handled=true;
         };
         var window=new MainWindow(smoke);MainWindow=window;

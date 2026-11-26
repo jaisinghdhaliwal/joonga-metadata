@@ -5,6 +5,8 @@ using System.Windows.Media;
 using System.Windows.Automation;
 using System.Windows.Documents;
 using System.Diagnostics;
+using System.Globalization;
+using System.Windows.Data;
 namespace MetadataTransfer.Windows;
 
 internal static class UI
@@ -69,9 +71,47 @@ internal static class UI
     }
     public static StackPanel Horizontal(params UIElement[] children) { var p=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};foreach(var c in children)p.Children.Add(c);return p; }
     public static Border Card(UIElement child,Thickness? padding=null) => new() {Child=child,Padding=padding??new Thickness(12),Background=Subtle,CornerRadius=new CornerRadius(8)};
-    public static void Open(string target) { try { Process.Start(new ProcessStartInfo(target){UseShellExecute=true}); } catch(Exception e) { MessageBox.Show(e.Message,"Could not open item"); } }
+    public static void Open(string target) { try { Process.Start(new ProcessStartInfo(target){UseShellExecute=true}); } catch(Exception e) { UI.Dialog(Application.Current?.MainWindow, e.Message,"Could not open item"); } }
     public static void Reveal(string path) { var p=new ProcessStartInfo("explorer.exe"){UseShellExecute=false};p.ArgumentList.Add("/select,");p.ArgumentList.Add(path);Process.Start(p); }
     public static Window Window(string title,double width,double height,Window? owner=null) => new() {Title=title,Width=width,Height=height,MinWidth=Math.Min(width,600),MinHeight=Math.Min(height,400),Owner=owner,WindowStartupLocation=owner is null?WindowStartupLocation.CenterScreen:WindowStartupLocation.CenterOwner,ThemeMode=ThemeMode.System,FontFamily=new FontFamily("Segoe UI Variable Text")};
+    public static MessageBoxResult Dialog(Window? owner, string message, string title,
+        MessageBoxButton buttons = MessageBoxButton.OK, MessageBoxImage image = MessageBoxImage.None, ImageSource? icon = null)
+    {
+        var dialog = Window(title, 430, 220, owner);
+        dialog.SizeToContent = SizeToContent.Height;
+        dialog.MinHeight = 0;
+        dialog.ResizeMode = ResizeMode.NoResize;
+        dialog.ShowInTaskbar = owner is null;
+        var content = new StackPanel { Margin = new Thickness(24) };
+        if (icon is not null) content.Children.Add(new Image { Source=icon, Width=48, Height=48, HorizontalAlignment=HorizontalAlignment.Left });
+        content.Children.Add(Text(title, 20, true));
+        var body = Text(message, 13);
+        body.Margin = new Thickness(0, 8, 0, 15);
+        content.Children.Add(body);
+        var actions = Horizontal();
+        actions.HorizontalAlignment = HorizontalAlignment.Right;
+        var result = MessageBoxResult.Cancel;
+        void Add(string label, MessageBoxResult value, bool cancel = false)
+        {
+            var button = Button(label, () => { result=value; dialog.DialogResult=!cancel; });
+            button.IsCancel = cancel;
+            button.IsDefault = cancel || buttons==MessageBoxButton.OK;
+            if (value is MessageBoxResult.OK or MessageBoxResult.Yes)
+                button.SetResourceReference(FrameworkElement.StyleProperty,"JoongaAccentButtonStyle");
+            actions.Children.Add(button);
+        }
+        if (buttons==MessageBoxButton.YesNoCancel)
+        {
+            Add("Save", MessageBoxResult.Yes);
+            Add("Discard", MessageBoxResult.No);
+        }
+        else Add("OK", MessageBoxResult.OK);
+        if (buttons!=MessageBoxButton.OK) Add("Cancel", MessageBoxResult.Cancel, true);
+        content.Children.Add(actions);
+        dialog.Content = content;
+        dialog.ShowDialog();
+        return result;
+    }
     public static void Results(Window owner,string title,string content)
     {
         var w=Window(title,840,580,owner);var grid=new DockPanel{Margin=new Thickness(20)};
@@ -86,4 +126,23 @@ internal static class UI
         group.Children.Add(new GeometryDrawing((Brush)Application.Current.FindResource("WorkspaceStripeBrush"),null,new RectangleGeometry(new Rect(0,0,1,FileRowHeight))));
         return new DrawingBrush(group){TileMode=TileMode.Tile,Viewport=new Rect(0,0,1,FileRowHeight*2),ViewportUnits=BrushMappingMode.Absolute,Stretch=Stretch.Fill};
     }
+}
+
+public sealed class AccentForegroundConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is not SolidColorBrush brush) return SystemColors.WindowTextBrush;
+        static double Linear(byte channel)
+        {
+            double value=channel/255d;
+            return value<=0.04045?value/12.92:Math.Pow((value+0.055)/1.055,2.4);
+        }
+        var color=brush.Color;
+        double luminance=0.2126*Linear(color.R)+0.7152*Linear(color.G)+0.0722*Linear(color.B);
+        return luminance>0.179?Brushes.Black:Brushes.White;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
 }

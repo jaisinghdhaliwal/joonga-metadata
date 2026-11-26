@@ -57,7 +57,9 @@ internal sealed class Inspector : DockPanel
         metadataControls.Children.Add(UI.Muted("Search metadata"));search.Margin=new Thickness(0,4,0,6);
         metadataControls.Children.Add(search);
         metadataControls.Children.Add(UI.Horizontal(differences,edit));
-        save=UI.Button("Save changes",()=>SaveRequested?.Invoke(),"Write changes to every selected file · Ctrl+S");save.SetResourceReference(Control.BackgroundProperty,SystemColors.HighlightBrushKey);save.SetResourceReference(Control.ForegroundProperty,SystemColors.HighlightTextBrushKey);revert=UI.Button("Revert",()=>RevertRequested?.Invoke());
+        save=UI.Button("Save changes",()=>SaveRequested?.Invoke(),"Write changes to every selected file · Ctrl+S");
+        save.SetResourceReference(StyleProperty,"JoongaAccentButtonStyle");
+        revert=UI.Button("Revert",()=>RevertRequested?.Invoke());
         editingControls.Children.Add(UI.Muted("Blank values remove a tag when saved."));
         editingControls.Children.Add(UI.Horizontal(revert,save));editingControls.Children.Add(count);editingControls.Children.Add(pendingLocation);
         pendingLocation.Visibility=Visibility.Collapsed;
@@ -65,7 +67,7 @@ internal sealed class Inspector : DockPanel
         var addPanel=new StackPanel();addPanel.Children.Add(UI.Muted("Tag name"));addPanel.Children.Add(tagName);addPanel.Children.Add(UI.Muted("Value"));addPanel.Children.Add(tagValue);
         addPanel.Children.Add(UI.Button("Add to selected files",()=>
         {
-            var key=tagName.Text.Trim();if(!WorkflowRules.Valid("-"+key+"="+tagValue.Text)){MessageBox.Show("Enter a tag such as XMP:Artist.","Invalid tag");return;}
+            var key=tagName.Text.Trim();if(!WorkflowRules.Valid("-"+key+"="+tagValue.Text)){UI.Dialog(Application.Current?.MainWindow, "Enter a tag such as XMP:Artist.","Invalid tag");return;}
             Stage?.Invoke(key,tagValue.Text);tagName.Clear();tagValue.Clear();
         }));newTag.Content=addPanel;editingControls.Children.Add(newTag);content.Children.Add(editingControls);content.Children.Add(groups);
         edit.Checked+=(_,_)=>Render();edit.Unchecked+=(_,_)=>Render();search.TextChanged+=(_,_)=>Render();differences.Checked+=(_,_)=>Render();differences.Unchecked+=(_,_)=>Render();Render();

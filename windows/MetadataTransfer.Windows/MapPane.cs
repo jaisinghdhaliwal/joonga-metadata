@@ -233,11 +233,21 @@ internal sealed class MapPane : DockPanel, IDisposable
         {
             _ = SendThumbnailAsync(thumbnailPath);
         }
-        else if (kind.GetString() == "pick" &&
+        else if (kind.GetString() is "pick" or "favourite-menu" &&
             message.TryGetProperty("latitude", out var lat) && lat.ValueKind == JsonValueKind.Number && lat.TryGetDouble(out var latitude) &&
             message.TryGetProperty("longitude", out var lon) && lon.ValueKind == JsonValueKind.Number && lon.TryGetDouble(out var longitude) &&
             latitude is >= -90 and <= 90 && longitude is >= -180 and <= 180)
         {
+            if (kind.GetString() == "favourite-menu")
+            {
+                var point = new GeoPoint("", latitude, longitude);
+                var menu = new ContextMenu { PlacementTarget = this, Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint };
+                var item = new MenuItem { Header = "Save to Favourites…" };
+                item.Click += (_, _) => SaveFavouriteAt(point);
+                menu.Items.Add(item);
+                menu.IsOpen = true;
+                return;
+            }
             lastPoint=new GeoPoint("",latitude,longitude);
             if(canWrite&&selection.Count>0)stage(latitude,longitude);
             UpdateActions();
@@ -353,6 +363,11 @@ internal sealed class MapPane : DockPanel, IDisposable
     public void SaveFavourite()
     {
         if((lastPoint??sourcePoint()) is not { } point){SetSearchStatus("Pick a point on the map or select a geotagged file first.");return;}
+        SaveFavouriteAt(point);
+    }
+
+    private void SaveFavouriteAt(GeoPoint point)
+    {
         var dialog=UI.Window("Save favourite location",380,180,Window.GetWindow(this));
         dialog.MinHeight=160;
         var panel=new StackPanel{Margin=new Thickness(16)};

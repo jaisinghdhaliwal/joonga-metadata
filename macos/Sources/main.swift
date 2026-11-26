@@ -964,7 +964,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
   }
 
   let appMenu = addMenu(productName)
-  appMenu.addItem(withTitle: "About \(productName)", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+  command(appMenu, "About \(productName)", #selector(showAbout))
   appMenu.addItem(.separator())
   command(appMenu, "Settings…", #selector(settings), key: ",")
   appMenu.addItem(.separator())
@@ -1055,6 +1055,26 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
   }
  }
  @objc private func openWorkflowLibrary() { library.openWorkflowDirectory() }
+ @objc private func showAbout() {
+  guard let window, window.attachedSheet == nil else { return }
+  let sheet = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 483, height: 220),
+                       styleMask: [.titled], backing: .buffered, defer: false)
+  sheet.title = "About \(productName)"
+  sheet.contentViewController = NSHostingController(rootView: AboutJoongaView(
+   close: { [weak window, weak sheet] in
+    if let sheet { window?.endSheet(sheet) }
+   },
+   canInstall: { [weak self] in
+    guard let library = self?.library else { return false }
+    return !library.busy && !library.mediaLoading && library.pendingPaths.isEmpty
+      && NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "").count <= 1
+   },
+   restart: { [weak window, weak sheet] in
+    if let sheet { window?.endSheet(sheet) }
+    NSApp.terminate(nil)
+   }).modifier(MacAccentModifier()))
+  window.beginSheet(sheet)
+ }
  @objc private func quickLook() { library.quickLook(library.selectedTargets) }
  @objc private func copyMetadata() { library.transfer() }
  @objc private func applySavedWorkflow(_ item: NSMenuItem) {

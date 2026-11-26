@@ -313,6 +313,7 @@ struct WorkspaceMapView: NSViewRepresentable {
     var isActive: Bool = true
     var accent = MacAccent()
     let onSelect: (Set<String>) -> Void
+    let onSaveFavourite: (CLLocationCoordinate2D) -> Void
     let onPick: (CLLocationCoordinate2D) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick) }
@@ -326,6 +327,9 @@ struct WorkspaceMapView: NSViewRepresentable {
         let click = NSClickGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pick(_:)))
         click.delegate = context.coordinator
         map.addGestureRecognizer(click)
+        let rightClick = NSClickGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.favouriteMenu(_:)))
+        rightClick.buttonMask = 0x2
+        map.addGestureRecognizer(rightClick)
         map.setAccessibilityLabel("Location picker map")
         context.coordinator.update(pins: pins, on: map)
         if let first = pins.first, pins.allSatisfy({ $0.coordinate.latitude == first.coordinate.latitude && $0.coordinate.longitude == first.coordinate.longitude }) {
@@ -343,6 +347,7 @@ struct WorkspaceMapView: NSViewRepresentable {
         let coordinator = context.coordinator
         coordinator.onPick = onPick
         coordinator.onSelect = onSelect
+        coordinator.onSaveFavourite = onSaveFavourite
         coordinator.accent = accent
         if view.mapType != style.type { view.mapType = style.type }
         let wasEmpty = coordinator.mediaPins.isEmpty
@@ -390,6 +395,24 @@ struct WorkspaceMapView: NSViewRepresentable {
             map.addAnnotations(mediaPins)
         }
         var lastSearchSelection: String?
+        var onSaveFavourite: ((CLLocationCoordinate2D) -> Void)?
+        private var favouritePoint: CLLocationCoordinate2D?
+
+        @objc func favouriteMenu(_ gesture: NSClickGestureRecognizer) {
+            guard gesture.state == .ended, let map = gesture.view as? MKMapView else { return }
+            let point = gesture.location(in: map)
+            let coordinate = map.convert(point, toCoordinateFrom: map)
+            guard CLLocationCoordinate2DIsValid(coordinate) else { return }
+            favouritePoint = coordinate
+            let menu = NSMenu()
+            let item = menu.addItem(withTitle: "Save to Favourites…", action: #selector(saveFavourite), keyEquivalent: "")
+            item.target = self
+            menu.popUp(positioning: nil, at: point, in: map)
+        }
+
+        @objc private func saveFavourite() {
+            if let favouritePoint { onSaveFavourite?(favouritePoint) }
+        }
 
         init(onPick: @escaping (CLLocationCoordinate2D) -> Void) {
             self.onPick = onPick

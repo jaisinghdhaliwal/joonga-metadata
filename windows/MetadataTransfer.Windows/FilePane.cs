@@ -154,7 +154,7 @@ internal sealed class FilePane : DockPanel
         if (Folder is null) return;
         if (!System.IO.Directory.Exists(Folder))
         {
-            MessageBox.Show(Window.GetWindow(this), "Reconnect the drive or choose another folder.", "Folder unavailable");
+            UI.Dialog(Window.GetWindow(this), "Reconnect the drive or choose another folder.", "Folder unavailable");
             return;
         }
         UI.Open(Folder);

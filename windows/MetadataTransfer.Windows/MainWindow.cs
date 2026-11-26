@@ -44,9 +44,7 @@ public sealed partial class MainWindow : Window
         top.Children.Add(progress);
         var footer=new DockPanel{Margin=new Thickness(16,8,12,10)};copy=UI.Button("Copy metadata",()=>CopyMetadata());cancel=UI.Button("Cancel",()=>{operation?.Cancel();status.Text="Stopping…";});cancel.Visibility=Visibility.Collapsed;
         saveAll=UI.Button("Save changes",SaveEdits);
-        saveAll.SetResourceReference(StyleProperty,"AccentButtonStyle");
-        saveAll.SetResourceReference(Control.BackgroundProperty,SystemColors.HighlightBrushKey);
-        saveAll.SetResourceReference(Control.ForegroundProperty,SystemColors.HighlightTextBrushKey);
+        saveAll.SetResourceReference(StyleProperty,"JoongaAccentButtonStyle");
         pendingFiles.Click+=(_,_)=>UI.Results(this,"Files with unsaved changes","Save Changes writes the staged metadata to these files."+Environment.NewLine+string.Join(Environment.NewLine,PendingPaths.OrderBy(path=>path).Select(path=>Path.GetFileName(path))));
         var right=UI.Horizontal(selectionCount,cancel,pendingFiles,saveAll,copy);DockPanel.SetDock(right,Dock.Right);footer.Children.Add(right);footer.Children.Add(status);DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);
         workspace.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star),MinWidth=280});workspace.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(5)});workspace.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star),MinWidth=280});workspace.ColumnDefinitions.Add(inspectorDivider);workspace.ColumnDefinitions.Add(inspectorColumn);
@@ -69,7 +67,7 @@ public sealed partial class MainWindow : Window
         SizeChanged+=(_,_)=> { if(mode!=WorkspaceMode.Transfer) ConstrainMediaPane(); };
         Closing+=(_,e)=>
         {
-            if(busy){MessageBox.Show(this,"An operation is still running. Use Cancel and wait for the current file to finish before closing.","Operation in progress");e.Cancel=true;return;}
+            if(busy){UI.Dialog(this,"An operation is still running. Use Cancel and wait for the current file to finish before closing.","Operation in progress");e.Cancel=true;return;}
             if(PendingPaths.Length>0&&!ConfirmDiscardChanges()){e.Cancel=true;return;}
             inspection?.Cancel();settings.Width=RestoreBounds.Width;settings.Height=RestoreBounds.Height;SaveSettings();
         };
@@ -184,11 +182,7 @@ public sealed partial class MainWindow : Window
             !busy && exif is not null && PendingPaths.Length>0, "Ctrl+S");
         AddAction(menu, "Last operation results", () => UI.Results(this, "Operation results", lastReport), lastReport.Length > 0);
         menu.Items.Add(new Separator());
-        AddAction(menu, "About " + App.ProductName, () =>
-        {
-            var version = typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-            MessageBox.Show(this, App.ProductName + "\nVersion " + version, "About " + App.ProductName);
-        });
+        AddAction(menu, "About " + App.ProductName, () => AppUpdater.ShowAbout(this, () => !busy && PendingPaths.Length == 0));
         OpenPopup(button, menu);
     }
 
@@ -238,7 +232,7 @@ public sealed partial class MainWindow : Window
     private async Task ChooseExif(Window owner)
     {
         if(busy)return;var dialog=new OpenFileDialog{Title="Choose exiftool.exe",Filter="ExifTool executable (*.exe)|*.exe"};if(dialog.ShowDialog(owner)!=true)return;
-        if(Path.GetFileName(dialog.FileName).Contains("(-k)",StringComparison.OrdinalIgnoreCase)){MessageBox.Show(this,"Rename exiftool(-k).exe to exiftool.exe first. Keep its exiftool_files folder beside it.","ExifTool setup");return;}
+        if(Path.GetFileName(dialog.FileName).Contains("(-k)",StringComparison.OrdinalIgnoreCase)){UI.Dialog(this,"Rename exiftool(-k).exe to exiftool.exe first. Keep its exiftool_files folder beside it.","ExifTool setup");return;}
         await ValidateExifTool(dialog.FileName);
     }
     private async Task ValidateExifTool(string requestedPath)
@@ -426,7 +420,7 @@ public sealed partial class MainWindow : Window
     private async void CopyMetadata()
     {
         if(mode!=WorkspaceMode.Transfer||busy||exif is null)return;var pairs=matches.Where(m=>m.Matched).ToArray();if(pairs.Length==0)return;
-        if(MessageBox.Show(this,$"Copy writable metadata to {pairs.Length} exports?\n\nExifTool saves backups beside the modified files. Media streams are not re-encoded.","Copy metadata",MessageBoxButton.OKCancel,MessageBoxImage.Question)!=MessageBoxResult.OK)return;
+        if(UI.Dialog(this,$"Copy writable metadata to {pairs.Length} exports?\n\nExifTool saves backups beside the modified files. Media streams are not re-encoded.","Copy metadata",MessageBoxButton.OKCancel,MessageBoxImage.Question)!=MessageBoxResult.OK)return;
         var lookup=pairs.ToDictionary(m=>m.Export!);await Batch(lookup.Keys.ToArray(),p=>exif.CopyAsync(lookup[p]),"Copying metadata");
     }
     private async Task Batch(string[] paths,Func<string,Task<OperationResult>> action,string title)
@@ -496,6 +490,15 @@ public sealed partial class MainWindow : Window
 
     private void UpdatePreviewButton(bool visible)
     {
+        var sidebar = new System.Windows.Shapes.Path
+        {
+            Data=Geometry.Parse("M 2,3 L 16,3 16,15 2,15 Z M 11,3 L 11,15" +
+                (visible ? " M 13,7 L 14.5,7 M 13,10 L 14.5,10" : "")),
+            StrokeThickness=1.25, Width=18, Height=18
+        };
+        sidebar.SetBinding(System.Windows.Shapes.Shape.StrokeProperty,
+            new System.Windows.Data.Binding(nameof(Control.Foreground)) { Source=previewPaneButton });
+        previewPaneButton.Content=sidebar;
         var label = visible ? "Hide preview pane" : "Show preview pane";
         previewPaneButton.ToolTip = label + " (Ctrl+I)";
         AutomationProperties.SetName(previewPaneButton, label);

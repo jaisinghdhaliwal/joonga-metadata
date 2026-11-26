@@ -66,6 +66,28 @@ public sealed partial class MainWindow
         modePicker.SelectedItem=mode;
         System.Windows.Automation.AutomationProperties.SetName(modePicker,"Workspace mode");
         modePicker.SelectionChanged+=(_,_)=> { if(modePicker.SelectedItem is WorkspaceMode value && value!=mode)SetMode(value); };
+        var pressedMode = (WorkspaceMode?)null;
+        modePicker.PreviewMouseLeftButtonDown+=(_, e)=>
+        {
+            pressedMode = ModeAt(e.OriginalSource);
+            if (pressedMode is not null) e.Handled = true;
+        };
+        modePicker.PreviewMouseLeftButtonUp+=(_, e)=>
+        {
+            if (pressedMode is not { } pressed) return;
+            pressedMode = null;
+            if (ModeAt(e.OriginalSource) == pressed)
+            {
+                SetMode(pressed);
+                if (modePicker.ItemContainerGenerator.ContainerFromItem(pressed) is ListBoxItem item) item.Focus();
+            }
+            e.Handled = true;
+        };
+        modePicker.MouseLeave+=(_,_)=>pressedMode=null;
+        WorkspaceMode? ModeAt(object source) =>
+            source is DependencyObject element &&
+            ItemsControl.ContainerFromElement(modePicker, element) is ListBoxItem { Content: WorkspaceMode value }
+                ? value : null;
         mediaWorkspace.ColumnDefinitions.Add(mediaFilesColumn);
         mediaWorkspace.ColumnDefinitions.Add(mediaGutter);
         mediaWorkspace.ColumnDefinitions.Add(mediaDetail);

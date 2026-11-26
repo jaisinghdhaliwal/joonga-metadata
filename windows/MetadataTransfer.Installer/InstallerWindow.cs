@@ -598,6 +598,11 @@ internal sealed class InstallerWindow : Window
         {
             await InstallEngine.InstallAsync(options, progress, installCts.Token);
             installedDir = options.InstallDirectory;
+            if (options.Update)
+            {
+                FinishAndMaybeLaunch(forceLaunch: true);
+                return;
+            }
             ShowCompleteView();
         }
         catch (OperationCanceledException)
@@ -686,9 +691,9 @@ internal sealed class InstallerWindow : Window
         stageHost.Content = dock;
     }
 
-    private void FinishAndMaybeLaunch()
+    private void FinishAndMaybeLaunch(bool forceLaunch = false)
     {
-        if (launchCheck?.IsChecked == true)
+        if (forceLaunch || launchCheck?.IsChecked == true)
         {
             string exePath = Path.Combine(installedDir, InstallEngine.ExecutableName);
             if (File.Exists(exePath))

@@ -81,7 +81,9 @@ public partial class App : Application
             CreateStartMenuShortcut: startMenu,
             CreateDesktopShortcut: desktop,
             UserAppData: userAppData,
-            UserDesktop: userDesktop);
+            UserDesktop: userDesktop,
+            Update: args.Contains("--update", StringComparer.OrdinalIgnoreCase),
+            Register: !args.Contains("--portable", StringComparer.OrdinalIgnoreCase));
     }
 
     private static string? GetArgValue(string[] args, string flag)

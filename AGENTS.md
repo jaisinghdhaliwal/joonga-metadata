@@ -216,6 +216,15 @@ inspired by Apple Photos.
 
 ### Current state (2026-11-26)
 
+- Right-clicking the workspace map opens a save-to-favourites action in both
+  apps. Saving uses the clicked coordinate without staging file edits.
+
+- The Windows title bar lets Mica show through in light and dark modes.
+  Primary buttons and focus outlines use the Windows accent, selected file
+  text uses the theme foreground, and workspace tabs commit on click release.
+  About and application dialogs use themed WPF windows. The preview toggle
+  depicts a right sidebar.
+
 - Added the Windows 11 Fluent installer (`windows/MetadataTransfer.Installer/`)
   and integrated Fluent uninstaller (`UninstallWindow.cs`, `--uninstall`).
   `windows/Build.ps1` now produces both the portable ZIP and a self-contained
@@ -354,6 +363,21 @@ mouse behaviour. Do not claim this has been visually verified solely because a
 cross-build succeeds.
 
 ## Distribution
+
+Both apps expose Check for Updates in About. They read the latest stable
+GitHub release and verify the matching asset against its GitHub SHA-256 digest.
+Keep versioned macOS ZIPs and per-architecture Windows Setup assets in each
+release. macOS stages beside the app, verifies the replacement bundle and
+signature, and swaps it after exit. Windows Setup accepts `--update`, waits
+for open instances to exit, installs to the existing app folder, and relaunches.
+It retains backups of overwritten files until the update completes. Portable
+Windows copies update in place without creating an uninstall registration.
+Updates require saved work, a writable macOS bundle parent, or administrator
+approval for system-wide Windows installations.
+
+Updater verification covered a live v0.9.2 lookup, an equal-version skip,
+macOS archive download, SHA-256, signature and staging, and x64/ARM64 Windows
+app and installer compilation. Interactive install and restart checks are open.
 
 Use GitHub CLI for release maintenance from the terminal. If GitHub CLI has
 no separate login, use the existing Git credential helper to supply

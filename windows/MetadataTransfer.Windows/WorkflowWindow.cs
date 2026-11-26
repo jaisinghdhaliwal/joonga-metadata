@@ -51,7 +51,7 @@ internal sealed class WorkflowWindow : Window
     }
     private bool Resolve()
     {
-        if(!Dirty)return true;var response=MessageBox.Show(this,"Save changes to this workflow?\n\nNo discards the changes.","Unsaved workflow",MessageBoxButton.YesNoCancel,MessageBoxImage.Question);
+        if(!Dirty)return true;var response=UI.Dialog(this,"Save changes to this workflow?\n\nNo discards the changes.","Unsaved workflow",MessageBoxButton.YesNoCancel,MessageBoxImage.Question);
         return response==MessageBoxResult.No||response==MessageBoxResult.Yes&&Save();
     }
     private void SelectChanged()
@@ -100,7 +100,7 @@ internal sealed class WorkflowWindow : Window
     private void Delete()
     {
         var ids=list.SelectedItems.Cast<Workflow>().Select(w=>w.Id).ToHashSet();if(ids.Count==0)return;
-        if(MessageBox.Show(this,$"Delete {ids.Count} workflows? Export a copy first if you want to keep them.","Delete workflows",MessageBoxButton.OKCancel,MessageBoxImage.Warning)!=MessageBoxResult.OK)return;
+        if(UI.Dialog(this,$"Delete {ids.Count} workflows? Export a copy first if you want to keep them.","Delete workflows",MessageBoxButton.OKCancel,MessageBoxImage.Warning)!=MessageBoxResult.OK)return;
         try{var updated=workflows.Where(w=>!ids.Contains(w.Id)).ToArray();store.Save(updated);workflows=updated;loading=true;current=null;creating=false;priorIDs=[];name.Clear();operations.Clear();loading=false;Filter();Update();status.Text="Workflows deleted.";}catch(Exception e){status.Text=e.Message;}
     }
     private void Import()

@@ -21,7 +21,7 @@ internal sealed class WindowHeader : Border
     {
         this.window = window;
         Height = HeaderHeight;
-        Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(55,110,110,110));
+        Background = System.Windows.Media.Brushes.Transparent;
         BorderBrush = UI.Subtle;
         BorderThickness = new Thickness(0, 0, 0, 1);
 

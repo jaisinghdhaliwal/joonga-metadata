@@ -555,6 +555,10 @@ private struct WorkspaceMap: View {
     var body: some View {
         WorkspaceMapView(pins: pins, searchSelection: library.mapFocusRequest, style: mapStyle, fitRequest: fitRequest, isActive: isActive, accent: accent, onSelect: { ids in
             library.mediaSelection = ids
+        }, onSaveFavourite: { coordinate in
+            guard !library.busy else { return }
+            library.lastMapPoint = MapCoordinate(coordinate)
+            library.requestSaveFavourite = true
         }) { coordinate in
             let point = MapCoordinate(coordinate)
             library.lastMapPoint = point

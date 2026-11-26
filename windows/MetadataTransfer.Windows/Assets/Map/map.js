@@ -160,6 +160,10 @@ function pick(point) {
 }
 
 map.on("click", event => pick(event.latlng));
+map.on("contextmenu", event => {
+    const point = event.latlng.wrap();
+    webview.postMessage({ kind: "favourite-menu", latitude: point.lat, longitude: point.lng });
+});
 map.on("zoomend", renderPins);
 webview.addEventListener("message", ({ data }) => {
     if (data.kind === "files") {
