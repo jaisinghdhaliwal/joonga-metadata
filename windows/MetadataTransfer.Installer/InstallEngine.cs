@@ -29,7 +29,7 @@ internal static class InstallEngine
     public const string UninstallKeyName = "JoongaTag";
     public const string UninstallSubkey = $@"Software\Microsoft\Windows\CurrentVersion\Uninstall\{UninstallKeyName}";
     public const string PayloadResourceName = "JoongaTag.Payload.zip";
-    public const string InfoUrl = "https://github.com/jaisinghdhaliwal/joonga-metadata";
+    public const string InfoUrl = "https://github.com/jaisinghdhaliwal/joonga-tag";
     public const string ExecutableName = "Joonga Tag.exe";
     public const string ShortcutFileName = "Joonga Tag.lnk";
 
@@ -173,6 +173,8 @@ internal static class InstallEngine
 
             ct.ThrowIfCancellationRequested();
             Directory.CreateDirectory(installDir);
+            string manifest = Path.Combine(installDir, "JoongaTag.install-files.txt");
+            string[] previousFiles = options.Update && File.Exists(manifest) ? File.ReadAllLines(manifest) : [];
 
             using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(PayloadResourceName)
                 ?? throw new InvalidOperationException("Installer payload is missing from this build.");
@@ -220,6 +222,8 @@ internal static class InstallEngine
             string exePath = Path.Combine(installDir, ExecutableName);
             if (!File.Exists(exePath))
                 throw new FileNotFoundException("Extracted installation is incomplete.", exePath);
+            if (previousFiles.Length > 0 && File.Exists(manifest))
+                File.WriteAllLines(manifest, File.ReadAllLines(manifest).Concat(previousFiles).Distinct(StringComparer.OrdinalIgnoreCase));
 
             if (options.CreateStartMenuShortcut)
             {

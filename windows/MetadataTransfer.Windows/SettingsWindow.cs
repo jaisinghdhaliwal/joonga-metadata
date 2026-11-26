@@ -8,10 +8,11 @@ namespace MetadataTransfer.Windows;
 
 internal sealed class SettingsWindow : Window
 {
+    internal bool UninstallRequested { get; private set; }
     public SettingsWindow(
         Window owner, Settings settings, Func<string?> exifToolPath,
         Func<Window,Task> chooseExifTool, Func<string,Task> applyExifTool, Action resetExifTool,
-        Action save, Action<bool> togglePreview, Action openWorkflowLibrary)
+        Action save, Action<bool> togglePreview, Action openWorkflowLibrary, Func<bool> canUninstall)
     {
         Owner = owner;
         Title = "Settings";
@@ -114,6 +115,17 @@ internal sealed class SettingsWindow : Window
             UI.Horizontal(chooseTool, applyTool, automaticTool), toolStatus,
             UI.Horizontal(UI.Button("Open Workflow Library Folder", openWorkflowLibrary)));
 
+        var uninstall = UI.Button("Uninstall Joonga Tag…", () =>
+        {
+            if (!canUninstall())
+            {
+                UI.Dialog(this, "Save or revert pending metadata edits before uninstalling.", "Unsaved changes");
+                return;
+            }
+            UninstallRequested = true;
+            Close();
+        });
+        AddSection("Uninstall", UI.Muted("Remove this app, workflows, settings, and caches."), UI.Horizontal(uninstall));
         layout.Children.Add(new ScrollViewer { Content = sections, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
         Content = layout;
     }

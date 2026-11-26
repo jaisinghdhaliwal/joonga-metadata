@@ -92,21 +92,22 @@ public sealed class Settings
     public const string ProductFolder = "Joonga Tag";
     public static string Folder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ProductFolder);
     public static string LocalFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ProductFolder);
-    public static string FilePath => Path.Combine(LocalFolder, "Settings.json");
+    public static string FilePath => Path.Combine(Folder, "Settings.json");
 
     public static void MigrateLegacyData()
     {
-        CopyIfMissing(Environment.SpecialFolder.ApplicationData, "Workflows.json", Folder);
-        CopyIfMissing(Environment.SpecialFolder.LocalApplicationData, "Settings.json", LocalFolder);
+        var roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        CopyIfMissing(Path.Combine(roaming, "Metadata Transfer", "Workflows.json"), Path.Combine(Folder, "Workflows.json"));
+        CopyIfMissing(Path.Combine(LocalFolder, "Settings.json"), FilePath);
+        CopyIfMissing(Path.Combine(local, "Metadata Transfer", "Settings.json"), FilePath);
     }
 
-    private static void CopyIfMissing(Environment.SpecialFolder scope, string name, string folder)
+    private static void CopyIfMissing(string source, string destination)
     {
-        string legacy = Path.Combine(Environment.GetFolderPath(scope), "Metadata Transfer", name);
-        string destination = Path.Combine(folder, name);
-        if (File.Exists(destination) || !File.Exists(legacy)) return;
-        Directory.CreateDirectory(folder);
-        try { File.Copy(legacy, destination, overwrite: false); }
+        if (File.Exists(destination) || !File.Exists(source)) return;
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        try { File.Copy(source, destination, overwrite: false); }
         catch (IOException) when (File.Exists(destination)) { }
     }
     public static Settings Load() => File.Exists(FilePath) ? JsonSerializer.Deserialize<Settings>(File.ReadAllText(FilePath), WorkflowStore.Json) ?? new() : new();

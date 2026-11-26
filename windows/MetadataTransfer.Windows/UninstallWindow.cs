@@ -26,7 +26,7 @@ internal sealed class UninstallWindow : Window
     private readonly Button cancelButton;
     private readonly TextBlock statusText;
 
-    public UninstallWindow()
+    public UninstallWindow(bool fromSettings = false)
     {
         installDir = NormalizeDirectory(AppContext.BaseDirectory);
         Title = $"Uninstall {App.ProductName}";
@@ -64,15 +64,13 @@ internal sealed class UninstallWindow : Window
         DockPanel.SetDock(header, Dock.Top);
         body.Children.Add(header);
 
-        cancelButton = UI.Button("Cancel", () => Application.Current.Shutdown(0));
+        cancelButton = UI.Button("Cancel", () => { if (fromSettings) Close(); else Application.Current.Shutdown(0); });
         cancelButton.IsCancel = true;
         cancelButton.MinWidth = 96;
 
         uninstallButton = UI.Button("Uninstall", () => _ = BeginUninstallAsync());
         uninstallButton.MinWidth = 112;
-        uninstallButton.SetResourceReference(StyleProperty, "AccentButtonStyle");
-        uninstallButton.SetResourceReference(Control.BackgroundProperty, SystemColors.HighlightBrushKey);
-        uninstallButton.SetResourceReference(Control.ForegroundProperty, SystemColors.HighlightTextBrushKey);
+        uninstallButton.SetResourceReference(StyleProperty, "JoongaAccentButtonStyle");
 
         statusText = UI.Muted("");
         statusText.VerticalAlignment = VerticalAlignment.Center;
@@ -98,7 +96,8 @@ internal sealed class UninstallWindow : Window
         removeUserData = new CheckBox
         {
             Content = "Also remove saved workflows and app settings",
-            IsChecked = false
+            IsChecked = fromSettings,
+            IsEnabled = !fromSettings
         };
         var dataSection = new StackPanel();
         dataSection.Children.Add(removeUserData);
@@ -201,8 +200,8 @@ internal sealed class UninstallWindow : Window
                 return;
             }
 
-            await Task.Run(() => ExecuteUninstall(installDir, deleteUserData, userAppData, userLocalAppData));
-            ScheduleDirectoryRemoval(installDir);
+            await Task.Run(() => ExecuteUninstall(installDir, userAppData));
+            ScheduleRemoval(installDir, deleteUserData, userAppData, userLocalAppData);
             Application.Current.Shutdown(0);
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
@@ -264,24 +263,17 @@ internal sealed class UninstallWindow : Window
             }
         }
 
-        ExecuteUninstall(installDir, deleteUserData, userAppData, userLocalAppData);
-        ScheduleDirectoryRemoval(installDir);
+        ExecuteUninstall(installDir, userAppData);
+        ScheduleRemoval(installDir, deleteUserData, userAppData, userLocalAppData);
         return 0;
     }
 
-    private static void ExecuteUninstall(string installDir, bool deleteUserData, string userAppData, string userLocalAppData)
+    private static void ExecuteUninstall(string installDir, string userAppData)
     {
         ValidateSafeUninstallDirectory(installDir);
-        CloseOtherInstances();
-
         RemoveMatchingShortcuts(installDir, userAppData);
         RemoveUninstallRegistryEntries(installDir);
 
-        if (deleteUserData)
-        {
-            DeleteDirectoryIfPresent(Path.Combine(userAppData, Settings.ProductFolder));
-            DeleteDirectoryIfPresent(Path.Combine(userLocalAppData, Settings.ProductFolder));
-        }
     }
 
     private static void ValidateSafeUninstallDirectory(string installDir)
@@ -302,33 +294,9 @@ internal sealed class UninstallWindow : Window
 
         if (!File.Exists(Path.Combine(full, "Joonga Tag.exe")))
             throw new InvalidOperationException("Joonga Tag executable was not found in this directory.");
+        _ = ReadInstalledFiles(full);
     }
 
-    private static void CloseOtherInstances()
-    {
-        int currentPid = Environment.ProcessId;
-        foreach (var proc in Process.GetProcessesByName("Joonga Tag"))
-        {
-            using (proc)
-            {
-                if (proc.Id == currentPid) continue;
-                try
-                {
-                    if (proc.CloseMainWindow())
-                        proc.WaitForExit(3000);
-                    if (!proc.HasExited)
-                    {
-                        proc.Kill(entireProcessTree: true);
-                        proc.WaitForExit(3000);
-                    }
-                }
-                catch
-                {
-                    // Ignore processes that already exited or cannot be closed.
-                }
-            }
-        }
-    }
 
     private static void RemoveMatchingShortcuts(string installDir, string userAppData)
     {
@@ -392,31 +360,85 @@ internal sealed class UninstallWindow : Window
         }
     }
 
-    private static void DeleteDirectoryIfPresent(string path)
+    private const string FileManifest = "JoongaTag.install-files.txt";
+
+    private static string[] ReadInstalledFiles(string directory)
     {
-        try
+        string manifest = Path.Combine(directory, FileManifest);
+        if (!File.Exists(manifest))
+            throw new InvalidOperationException("The installation file list is missing. Use an official Joonga Tag package.");
+        string prefix = directory + Path.DirectorySeparatorChar;
+        var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { manifest };
+        foreach (string entry in File.ReadLines(manifest))
         {
-            if (Directory.Exists(path))
-                Directory.Delete(path, recursive: true);
+            if (string.IsNullOrWhiteSpace(entry) || Path.IsPathRooted(entry) || entry.Contains(':'))
+                throw new InvalidDataException("The installation file list contains an invalid path.");
+            string target = Path.GetFullPath(Path.Combine(directory, entry));
+            if (!target.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("The installation file list points outside Joonga Tag.");
+            for (string? folder = Path.GetDirectoryName(target); folder is not null && folder.StartsWith(directory, StringComparison.OrdinalIgnoreCase); folder = Path.GetDirectoryName(folder))
+                if (Directory.Exists(folder) && File.GetAttributes(folder).HasFlag(FileAttributes.ReparsePoint))
+                    throw new IOException("An installation directory redirects to another location.");
+            files.Add(target);
         }
-        catch
-        {
-            // Ignore locked files during optional user-data cleanup.
-        }
+        if (!files.Contains(Path.Combine(directory, "Joonga Tag.exe")))
+            throw new InvalidDataException("The installation file list is incomplete.");
+        return files.ToArray();
     }
 
-    private static void ScheduleDirectoryRemoval(string installDir)
+    private static void ScheduleRemoval(string installDir, bool removeData, string userAppData, string userLocalAppData)
     {
-        string safeDir = NormalizeDirectory(installDir);
-        string command = $"/c ping 127.0.0.1 -n 3 >nul & rmdir /s /q \"{safeDir}\"";
-        var psi = new ProcessStartInfo("cmd.exe", command)
+        var files = ReadInstalledFiles(installDir);
+        string[] data = removeData ? [Path.Combine(userAppData, Settings.ProductFolder),
+            Path.Combine(userLocalAppData, Settings.ProductFolder)] : [];
+        string payload = Convert.ToBase64String(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
         {
+            files, data, installDir, pid = Environment.ProcessId
+        }));
+        string script = """
+            $job = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([Console]::In.ReadToEnd())) | ConvertFrom-Json
+            Wait-Process -Id $job.pid -Timeout 30 -ErrorAction SilentlyContinue
+            if (Get-Process -Id $job.pid -ErrorAction SilentlyContinue) { exit 1 }
+            $dirs = @{}
+            $failed = $false
+            foreach ($file in $job.files) {
+                for ($i = 0; $i -lt 10; $i++) {
+                    try { [IO.File]::Delete($file); break } catch { Start-Sleep -Milliseconds 350 }
+                }
+                if ([IO.File]::Exists($file)) { $failed = $true }
+                $dir = [IO.Path]::GetDirectoryName($file)
+                while ($dir -eq $job.installDir -or $dir.StartsWith($job.installDir + '\', [StringComparison]::OrdinalIgnoreCase)) {
+                    $dirs[$dir] = 1
+                    $dir = [IO.Path]::GetDirectoryName($dir)
+                }
+            }
+            foreach ($dir in ($dirs.Keys | Sort-Object Length -Descending)) {
+                try { if ([IO.Directory]::Exists($dir)) { [IO.Directory]::Delete($dir, $false) } } catch { }
+            }
+            foreach ($dir in $job.data) {
+                try { if ([IO.Directory]::Exists($dir)) { [IO.Directory]::Delete($dir, $true) } }
+                catch { $failed = $true }
+            }
+            if ($failed) {
+                Add-Type -AssemblyName PresentationFramework
+                [System.Windows.MessageBox]::Show('Some Joonga Tag files could not be removed. Close any other copies of the app before uninstalling.', 'Joonga Tag') | Out-Null
+            }
+            """;
+        var psi = new ProcessStartInfo
+        {
+            FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe"),
             CreateNoWindow = true,
-            WindowStyle = ProcessWindowStyle.Hidden,
             UseShellExecute = false,
+            RedirectStandardInput = true,
             WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System)
         };
-        Process.Start(psi);
+        psi.ArgumentList.Add("-NoProfile");
+        psi.ArgumentList.Add("-NonInteractive");
+        psi.ArgumentList.Add("-EncodedCommand");
+        psi.ArgumentList.Add(Convert.ToBase64String(Encoding.Unicode.GetBytes(script)));
+        using var helper = Process.Start(psi) ?? throw new IOException("Could not start uninstall cleanup.");
+        helper.StandardInput.Write(payload);
+        helper.StandardInput.Close();
     }
 
     private static bool RequiresElevation(string installDir)

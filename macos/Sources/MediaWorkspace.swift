@@ -361,13 +361,13 @@ extension Library {
 
     var favouriteLocations: [FavouriteLocation] {
         _ = favouriteLocationsVersion
-        guard let data = UserDefaults.standard.data(forKey: "MapFavourites") else { return [] }
+        guard let data = JoongaTagStorage.data(forKey: "MapFavourites") else { return [] }
         return (try? JSONDecoder().decode([FavouriteLocation].self, from: data)) ?? []
     }
 
     func storeFavouriteLocations(_ items: [FavouriteLocation]) {
         if let data = try? JSONEncoder().encode(items) {
-            UserDefaults.standard.set(data, forKey: "MapFavourites")
+            JoongaTagStorage.set(data, forKey: "MapFavourites")
             favouriteLocationsVersion = UUID()
         }
     }
@@ -532,8 +532,8 @@ private struct WorkspaceMap: View {
     @ObservedObject var library: Library
     let isActive: Bool
     @Environment(\.joongaAccent) private var accent
-    @AppStorage("WorkspaceMapStyle") private var mapStyle = WorkspaceMapStyle.standard
-    @AppStorage("MapShowsSelectedOnly") private var selectedOnly = false
+    @State private var mapStyle = WorkspaceMapStyle(rawValue: JoongaTagStorage.string(forKey: "WorkspaceMapStyle") ?? "") ?? .standard
+    @State private var selectedOnly = JoongaTagStorage.object(forKey: "MapShowsSelectedOnly") as? Bool ?? false
     @State private var fitRequest: UUID?
     @State private var query = ""
     @State private var search: MKLocalSearch?
@@ -655,6 +655,8 @@ private struct WorkspaceMap: View {
             guard isActive else { return }
             if ids.count == 1, let sourcePoint { focusPoint(sourcePoint) }
         }
+        .onChange(of: mapStyle) { JoongaTagStorage.set($0.rawValue, forKey: "WorkspaceMapStyle") }
+        .onChange(of: selectedOnly) { JoongaTagStorage.set($0, forKey: "MapShowsSelectedOnly") }
         .onDisappear { search?.cancel() }
         .alert("Save Favourite Location", isPresented: $library.requestSaveFavourite) {
             TextField("Name, e.g. Home", text: $name)

@@ -148,7 +148,7 @@ struct MediaTable: NSViewRepresentable {
         }
 
         private func savedColumns(for mode: WorkspaceMode) -> [Column] {
-            let raw = UserDefaults.standard.stringArray(forKey: defaultsKey(for: mode)) ?? []
+            let raw = JoongaTagStorage.stringArray(forKey: defaultsKey(for: mode)) ?? []
             var loaded = raw.compactMap(Column.init(rawValue:)).filter { $0 != .status }
             if loaded.isEmpty {
                 loaded = Column.defaults(for: mode)
@@ -159,7 +159,7 @@ struct MediaTable: NSViewRepresentable {
         }
 
         private func saveColumns(_ columns: [Column], for mode: WorkspaceMode) {
-            UserDefaults.standard.set(columns.map(\.rawValue), forKey: defaultsKey(for: mode))
+            JoongaTagStorage.set(columns.map(\.rawValue), forKey: defaultsKey(for: mode))
         }
 
         func syncColumns(on table: NSTableView, mode: WorkspaceMode) {
@@ -417,7 +417,7 @@ struct MediaTable: NSViewRepresentable {
 
         @objc private func resetColumns() {
             guard let table = currentTable else { return }
-            UserDefaults.standard.removeObject(forKey: defaultsKey(for: mode))
+            JoongaTagStorage.removeObject(forKey: defaultsKey(for: mode))
             syncColumns(on: table, mode: mode)
             snapshot = []
             update(table)

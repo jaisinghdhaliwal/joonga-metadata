@@ -7,7 +7,7 @@ A native Windows metadata editor and transfer utility, built with C#, .NET 10 WP
 **Installer (recommended):**
 1. Choose **Joonga-Tag-*-Windows-x64-Setup.exe** for Intel/AMD PCs, or **Joonga-Tag-*-Windows-arm64-Setup.exe** for Windows on ARM.
 2. Run the Windows 11 Setup wizard to install to `Program Files\Joonga Tag` (all users), `%LocalAppData%\Programs\Joonga Tag` (current user), or a custom folder you choose, with optional Start Menu and Desktop shortcuts.
-3. Uninstall anytime from Windows **Settings → Apps → Installed apps** (or by running `"Joonga Tag.exe" --uninstall`).
+3. Use **Settings → Uninstall Joonga Tag…** in the app to remove it, including settings, workflows, and caches. Windows **Installed apps** also opens the uninstaller and offers a choice to keep personal data.
 
 **Portable ZIP:**
 1. Choose the **win-x64** ZIP for Intel/AMD PCs, or **win-arm64** for Windows on ARM.
@@ -52,8 +52,11 @@ Joonga Tag copies settings and workflows from the old `Metadata Transfer` folder
 **New**, **Duplicate**, **Delete** and **Save workflow** manage presets. The editor is one large text box: one `-Tag=Value` or `-Destination<Source` operation per line, with no shell quoting. Standard Ctrl+C/V/X/A/Z/Y shortcuts work. Invalid lines are identified before applying. Unsaved workflow changes prompt Save/Discard/Cancel when leaving the editor. Targets default to the active file selection; all-originals/all-exports scopes are also available.
 
 - Workflows: `%APPDATA%\Joonga Tag\Workflows.json`
-- Preferences: `%LOCALAPPDATA%\Joonga Tag\Settings.json`
+- Preferences: `%APPDATA%\Joonga Tag\Settings.json`
 - Map browser cache: `%LOCALAPPDATA%\Joonga Tag\WebView2`
+
+Existing settings in `%LOCALAPPDATA%\Joonga Tag\Settings.json` take
+precedence over older Metadata Transfer settings during migration.
 
 Open the **Settings** gear or press Ctrl+comma to choose or clear the default exports folder, show or hide the preview, open the workflow library, and configure ExifTool. The default exports folder is used on the next launch. You can also save the current export folder from its pane menu. If you configure another ExifTool installation, rename `exiftool(-k).exe` to `exiftool.exe`, and keep its full `exiftool_files` folder alongside it. Closing the main window exits the app. Pending writes must finish (or be cancelled between files); unsaved edits prompt before exit.
 

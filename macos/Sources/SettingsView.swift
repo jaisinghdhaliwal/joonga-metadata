@@ -23,7 +23,7 @@ extension Library {
     }
 
     func configureExifTool() {
-        let stored = UserDefaults.standard.string(forKey: Self.customExifToolDefaultsKey)?
+        let stored = JoongaTagStorage.string(forKey: Self.customExifToolDefaultsKey)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         applyExifToolConfiguration(
             customPath: stored?.isEmpty == false ? stored : nil,
@@ -130,7 +130,7 @@ extension Library {
                     return false
                 }
                 if persist {
-                    UserDefaults.standard.set(normalized, forKey: Self.customExifToolDefaultsKey)
+                    JoongaTagStorage.set(normalized, forKey: Self.customExifToolDefaultsKey)
                 }
                 updateActiveExifTool(path: normalized, customPath: normalized, version: probedVersion, error: nil, reloadMedia: reloadMedia)
                 return true
@@ -146,7 +146,7 @@ extension Library {
                 return false
             }
             if persist {
-                UserDefaults.standard.set(normalized, forKey: Self.customExifToolDefaultsKey)
+                JoongaTagStorage.set(normalized, forKey: Self.customExifToolDefaultsKey)
             }
             updateActiveExifTool(path: normalized, customPath: normalized, version: nil, error: nil, reloadMedia: reloadMedia)
             refreshExifToolVersion(for: normalized)
@@ -154,7 +154,7 @@ extension Library {
         }
 
         if persist {
-            UserDefaults.standard.removeObject(forKey: Self.customExifToolDefaultsKey)
+            JoongaTagStorage.removeObject(forKey: Self.customExifToolDefaultsKey)
         }
         let resolved = bundledExifToolPath ?? systemExifToolPath
         let error = resolved == nil ? "Bundled ExifTool was not found." : nil
@@ -242,7 +242,9 @@ struct SettingsView: View {
     @ObservedObject var library: Library
     @Environment(\.dismiss) private var dismiss
     @Environment(\.joongaAccent) private var accent
-    @AppStorage("ShowPreviewOnLaunch") private var showPreviewOnLaunch = true
+    @State private var showPreviewOnLaunch = JoongaTagStorage.object(forKey: "ShowPreviewOnLaunch") as? Bool ?? true
+    @State private var confirmingUninstall = false
+    @State private var uninstallError: String?
     @State private var exifToolInput = ""
 
     private var trimmedExifInput: String {
@@ -334,6 +336,13 @@ struct SettingsView: View {
                         Button("Open Library Folder") { library.openWorkflowDirectory() }
                     }
                 }
+                Section("Uninstall") {
+                    Button("Uninstall Joonga Tag…", role: .destructive) { confirmingUninstall = true }
+                        .disabled(library.busy || library.mediaLoading || !library.pendingPaths.isEmpty)
+                    Text("Removes this copy of the app, settings, workflows, and caches.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if let uninstallError { Text(uninstallError).foregroundStyle(.secondary) }
+                }
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
@@ -348,6 +357,17 @@ struct SettingsView: View {
         .onAppear { exifToolInput = currentExifDisplayPath }
         .onChange(of: library.exif) { _ in exifToolInput = currentExifDisplayPath }
         .onChange(of: library.customExifToolPath) { _ in exifToolInput = currentExifDisplayPath }
-        .onChange(of: showPreviewOnLaunch) { library.showInspector = $0 }
+        .onChange(of: showPreviewOnLaunch) {
+            JoongaTagStorage.set($0, forKey: "ShowPreviewOnLaunch")
+            library.showInspector = $0
+        }
+        .confirmationDialog("Uninstall Joonga Tag?", isPresented: $confirmingUninstall, titleVisibility: .visible) {
+            Button("Uninstall", role: .destructive) {
+                do { try (NSApp.delegate as? App)?.uninstall() }
+                catch { uninstallError = error.localizedDescription }
+            }
+        } message: {
+            Text("This removes Joonga Tag’s settings and workflows. Photos, videos, exports, and separately installed software are kept.")
+        }
     }
 }

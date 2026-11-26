@@ -56,6 +56,10 @@ try {
         dotnet run --project MetadataTransfer.Tests -c Release -- (Join-Path $tools 'exiftool.exe')
         if ($LASTEXITCODE -ne 0) { throw 'Regression checks failed.' }
     }
+    $manifest = Join-Path $output 'JoongaTag.install-files.txt'
+    $relativeFiles = Get-ChildItem -LiteralPath $output -Recurse -File | Where-Object { $_.FullName -ne $manifest } |
+        ForEach-Object { [System.IO.Path]::GetRelativePath($output, $_.FullName) }
+    Set-Content -LiteralPath $manifest -Value $relativeFiles -Encoding utf8
     $zip = Join-Path $PSScriptRoot "build/Joonga-Tag-Windows-${Runtime}.zip"
     Compress-Archive -Path $output -DestinationPath $zip -Force
     Write-Host "Ready: $zip"

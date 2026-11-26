@@ -13,7 +13,7 @@ namespace MetadataTransfer.Windows;
 
 internal static class AppUpdater
 {
-    private const string Repository = "jaisinghdhaliwal/joonga-metadata";
+    private const string Repository = "jaisinghdhaliwal/joonga-tag";
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromMinutes(5) };
     private sealed record Release(string Tag, Uri Asset, byte[] Digest, long Size);
 
@@ -128,7 +128,7 @@ internal static class AppUpdater
 
         if (release.Size <= 0 || release.Size > 512L * 1024 * 1024)
             throw new InvalidDataException("Unexpected installer size.");
-        var staging = Directory.CreateTempSubdirectory("JoongaUpdate-");
+        var staging = Directory.CreateDirectory(Path.Combine(MetadataTransfer.Core.Settings.LocalFolder, "Updates", Guid.NewGuid().ToString("N")));
         string installer = Path.Combine(staging.FullName, "Joonga Tag Setup.exe");
         try
         {

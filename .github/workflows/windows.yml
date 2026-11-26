@@ -73,7 +73,16 @@ jobs:
           if (-not (Test-Path -LiteralPath $startMenuShortcut)) { throw 'Start Menu shortcut missing.' }
           if (-not (Test-Path -LiteralPath $regPath)) { throw 'Uninstall registry entry missing.' }
 
-          $uninstallProc = Start-Process $installedExe -ArgumentList @('--uninstall', '--quiet') -PassThru
+          $unrelatedFile = Join-Path $installDir 'keep-me.txt'
+          Set-Content -LiteralPath $unrelatedFile -Value 'This file did not ship with the app.'
+          $testRoaming = Join-Path $env:RUNNER_TEMP 'JoongaTagTestRoaming'
+          $testLocal = Join-Path $env:RUNNER_TEMP 'JoongaTagTestLocal'
+          $testSettings = Join-Path $testRoaming 'Joonga Tag'
+          $testCache = Join-Path $testLocal 'Joonga Tag'
+          New-Item -ItemType Directory -Force $testSettings, $testCache | Out-Null
+          Set-Content -LiteralPath (Join-Path $testSettings 'Settings.json') -Value '{}'
+          Set-Content -LiteralPath (Join-Path $testCache 'cache.txt') -Value 'test'
+          $uninstallProc = Start-Process $installedExe -ArgumentList @('--uninstall', '--quiet', '--remove-data', '--user-appdata', "`"$testRoaming`"", '--user-localappdata', "`"$testLocal`"") -PassThru
           if (-not $uninstallProc.WaitForExit(120000)) {
             Stop-Process -Id $uninstallProc.Id -ErrorAction SilentlyContinue
             throw 'Silent uninstall timed out.'
@@ -81,12 +90,14 @@ jobs:
           if ($uninstallProc.ExitCode -ne 0) { throw "Silent uninstall failed: $($uninstallProc.ExitCode)" }
 
           $deadline = (Get-Date).AddSeconds(20)
-          while ((Test-Path -LiteralPath $installDir) -and (Get-Date) -lt $deadline) {
+          while (((Test-Path -LiteralPath $installedExe) -or (Test-Path -LiteralPath $testSettings) -or (Test-Path -LiteralPath $testCache)) -and (Get-Date) -lt $deadline) {
             Start-Sleep -Milliseconds 500
           }
           if (Test-Path -LiteralPath $startMenuShortcut) { throw 'Start Menu shortcut was not removed.' }
           if (Test-Path -LiteralPath $regPath) { throw 'Uninstall registry entry was not removed.' }
-          if (Test-Path -LiteralPath $installDir) { throw 'Install directory was not removed.' }
+          if ((Test-Path -LiteralPath $installedExe) -or (Test-Path -LiteralPath $installedExif) -or (Test-Path -LiteralPath (Join-Path $installDir 'JoongaTag.install-files.txt'))) { throw 'Packaged files were not removed.' }
+          if ((Test-Path -LiteralPath $testSettings) -or (Test-Path -LiteralPath $testCache)) { throw 'App data was not removed.' }
+          if (-not (Test-Path -LiteralPath $unrelatedFile)) { throw 'Uninstall removed an unrelated file.' }
       - uses: actions/upload-artifact@v4
         with:
           name: Joonga-Tag-Windows-${{ matrix.runtime }}

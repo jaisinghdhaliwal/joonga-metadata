@@ -12,7 +12,7 @@ Install Xcode 26 or newer and run `bash macos/build.command` from the repository
 
 Select files in either pane and click a saved workflow in the **Workflows** menu to stage it for that selection. The list refreshes whenever you open the menu. Use **Manage Workflows** to edit presets or choose a different target scope.
 
-Joonga Tag stores workflows at `~/Library/Application Support/Joonga Tag/Workflows.json` and settings in `~/Library/Preferences/com.jaisinghdhaliwal.joongatag.plist`. It copies existing data from `~/Library/Application Support/Metadata Transfer/Workflows.json` and the preference domain `local.codex.metadatapreview` when migrating. After confirming your workflows and settings in Joonga Tag, you can remove those legacy files. New installations start with an empty workflow library.
+Joonga Tag stores `Workflows.json` and `Settings.json` together in `~/Library/Application Support/Joonga Tag/`. It imports old workflows from the Metadata Transfer support folder and settings from the previous preference domains. The system keeps its own window state separately. To remove the app and its data, open **Settings → Uninstall Joonga Tag…**.
 
 Open Workflows from the toolbar. Use New Workflow or Command-N, name it, and enter ExifTool metadata operations in the large editor, one per line. Save Workflow or Command-S creates or updates that workflow. Duplicate starts a separate copy. Select one or multiple workflows and use Delete, or press Delete while the workflow list has focus. Import accepts several JSON libraries. Export saves selected workflows or the complete library as a portable, versioned JSON file. Import merges exact duplicates and validates all selected files before saving.
 

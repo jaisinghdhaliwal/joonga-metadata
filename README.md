@@ -10,7 +10,7 @@
 
 ## Downloads
 
-Get the latest builds from [GitHub Releases](https://github.com/jaisinghdhaliwal/joonga-metadata/releases).
+Get the latest builds from [GitHub Releases](https://github.com/jaisinghdhaliwal/joonga-tag/releases).
 
 Joonga Tag was previously called Joonga Metadata. On first launch it copies
 existing settings and workflows into the new app’s storage. **About Joonga Tag**

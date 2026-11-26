@@ -76,7 +76,7 @@ struct AboutJoongaView: View {
 }
 
 enum MacAppUpdater {
-    private static let repository = "jaisinghdhaliwal/joonga-metadata"
+    private static let repository = "jaisinghdhaliwal/joonga-tag"
     struct Release: Sendable {
         let version: String
         let zip: URL

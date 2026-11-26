@@ -69,7 +69,8 @@ public sealed partial class MainWindow : Window
         {
             if(busy){UI.Dialog(this,"An operation is still running. Use Cancel and wait for the current file to finish before closing.","Operation in progress");e.Cancel=true;return;}
             if(PendingPaths.Length>0&&!ConfirmDiscardChanges()){e.Cancel=true;return;}
-            inspection?.Cancel();settings.Width=RestoreBounds.Width;settings.Height=RestoreBounds.Height;SaveSettings();
+            inspection?.Cancel();
+            if (!uninstalling) { settings.Width=RestoreBounds.Width;settings.Height=RestoreBounds.Height;SaveSettings(); }
         };
         SetMode(WorkspaceMode.Metadata);UpdateControls();
         Closed+=(_,_)=>mapPane?.Dispose();
@@ -266,6 +267,8 @@ public sealed partial class MainWindow : Window
         UI.Open(Settings.Folder);
     }
 
+    private bool uninstalling;
+
     private void ShowSettings()
     {
         if (busy) return;
@@ -274,8 +277,20 @@ public sealed partial class MainWindow : Window
             {
                 if (settings.ShowInspector != show) ToggleInspector();
                 SaveSettings();
-            }, OpenWorkflowLibrary);
+            }, OpenWorkflowLibrary, () => PendingPaths.Length == 0);
         dialog.ShowDialog();
+        if (!dialog.UninstallRequested) return;
+        var instances = System.Diagnostics.Process.GetProcessesByName(App.ProductName);
+        bool otherInstance = instances.Any(process => process.Id != Environment.ProcessId);
+        foreach (var process in instances) process.Dispose();
+        if (otherInstance)
+        {
+            UI.Dialog(this, "Close other copies of Joonga Tag before uninstalling.", "Joonga Tag is open");
+            return;
+        }
+        uninstalling = true;
+        try { new UninstallWindow(fromSettings: true) { Owner=this }.ShowDialog(); }
+        finally { uninstalling = false; }
     }
 
     private void Choose(FilePane pane)

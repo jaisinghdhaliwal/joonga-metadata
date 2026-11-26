@@ -54,7 +54,7 @@ from a generic developer-tool palette.
   editable `macos/AppIcon *.icon` source and use its compiled artwork for macOS
   builds; do not silently fall back to a different generic icon.
 - The product was renamed from Metadata Transfer to Joonga Metadata and then
-  to Joonga Tag. The GitHub repository address remains `jaisinghdhaliwal/joonga-metadata`.
+  to Joonga Tag. The GitHub repository address is `jaisinghdhaliwal/joonga-tag`.
 
 The design bar is “convincingly native”, not merely decorated: use Finder/Photos
 and Windows 11 Settings as references for density, typography, window chrome,
@@ -157,9 +157,10 @@ inspired by Apple Photos.
   only if unbundled). Settings allows configuring a custom ExifTool path
   (stored in Preferences as `CustomExifToolPath`, validated with `-ver`) and
   restoring the app-bundled ExifTool with one button.
-- Workflows are stored at `~/Library/Application Support/Joonga Tag/Workflows.json`
-  and settings use the preference domain `com.jaisinghdhaliwal.joongatag`.
-  On first launch the app copies preferences from `local.codex.metadatapreview`
+- `Settings.json` and `Workflows.json` share
+  `~/Library/Application Support/Joonga Tag/`.
+  On first launch the app imports settings from `com.jaisinghdhaliwal.joongatag`
+  and the older `local.codex.metadatapreview` preference domain
   and imports workflows from `~/Library/Application Support/Metadata Transfer/Workflows.json`
   when a new workflow library is missing.
 - Apple Maps tiles and place search require a network connection.
@@ -192,10 +193,11 @@ inspired by Apple Photos.
   .NET/WPF; official x64 ExifTool works through Windows 11 emulation.
 - Persistent paths:
   - workflows: `%APPDATA%\Joonga Tag\Workflows.json`
-  - settings: `%LOCALAPPDATA%\Joonga Tag\Settings.json`
+  - settings: `%APPDATA%\Joonga Tag\Settings.json`
   - WebView2 cache: `%LOCALAPPDATA%\Joonga Tag\WebView2`
-- The new app copies the settings and workflow files from the corresponding
-  `Metadata Transfer` folders only when the new files are missing.
+- When the destination is missing, the app copies workflows from the legacy
+  `Metadata Transfer` folder and settings from LocalAppData, preferring the
+  previous Joonga Tag settings over the older Metadata Transfer settings.
   The Joonga Tag installer uses its own uninstall registration.
 
 ### Metadata flow
@@ -369,6 +371,12 @@ cross-build succeeds.
 
 ## Distribution
 
+Settings → Uninstall removes the current Joonga Tag installation and current
+user app data after confirmation. macOS deletes the running bundle and known
+app data after exit. Windows packages carry a manifest so uninstall removes
+only the installed files, matching shortcuts, registration, and app data.
+Previous Joonga Metadata installations and user media are outside that scope.
+
 New release assets must use the Joonga Tag prefix, including
 `Joonga-Tag-<version>-macOS.zip` and
 `Joonga-Tag-<version>-Windows-<architecture>-Setup.exe`. Published Joonga
@@ -397,7 +405,7 @@ verified with this setup on 2026-11-25.
 
 Current public version: **0.9.2** (`v0.9.2`, commit
 `5ff3bf2d3a866d7b1584e3187971bd86471e8816`). The release page is:
-<https://github.com/jaisinghdhaliwal/joonga-metadata/releases/tag/v0.9.2>
+<https://github.com/jaisinghdhaliwal/joonga-tag/releases/tag/v0.9.2>
 
 Published assets for that release (all built from commit
 `5ff3bf2d3a866d7b1584e3187971bd86471e8816`):

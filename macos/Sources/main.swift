@@ -52,7 +52,7 @@ final class Library: ObservableObject {
   self.workflowFile = workflowFile ?? JoongaTagStorage.workflows
   loadPresets()
   configureExifTool()
-  if let data=UserDefaults.standard.data(forKey:"DefaultExportsBookmark") { var stale=false; defaultExports=try? URL(resolvingBookmarkData:data,options:[],relativeTo:nil,bookmarkDataIsStale:&stale); destination=defaultExports }
+  if let data=JoongaTagStorage.data(forKey:"DefaultExportsBookmark") { var stale=false; defaultExports=try? URL(resolvingBookmarkData:data,options:[],relativeTo:nil,bookmarkDataIsStale:&stale); destination=defaultExports }
  }
  func saveDefaultExports() {
   if let destination { storeDefaultExports(destination) }
@@ -60,13 +60,13 @@ final class Library: ObservableObject {
  func storeDefaultExports(_ folder: URL) {
   do {
    let bookmark = try folder.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
-   UserDefaults.standard.set(bookmark, forKey: "DefaultExportsBookmark")
+   JoongaTagStorage.set(bookmark, forKey: "DefaultExportsBookmark")
    defaultExports = folder
   } catch {
    NSAlert(error: error).runModal()
   }
  }
- func clearDefaultExports(){ UserDefaults.standard.removeObject(forKey:"DefaultExportsBookmark"); defaultExports=nil }
+ func clearDefaultExports(){ JoongaTagStorage.removeObject(forKey:"DefaultExportsBookmark"); defaultExports=nil }
  @Published var source: URL?
  @Published var destination: URL?
  @Published var files: [Match] = []
@@ -139,7 +139,7 @@ final class Library: ObservableObject {
  @Published var metadata: [MetadataRow] = []
  @Published var locationPins = [LocationPin]()
  private var inspectionVersion = 0
- @Published var showInspector = UserDefaults.standard.object(forKey: "ShowPreviewOnLaunch") as? Bool ?? true {
+ @Published var showInspector = JoongaTagStorage.object(forKey: "ShowPreviewOnLaunch") as? Bool ?? true {
   didSet { if showInspector && !oldValue && mode == .metadata { inspect() } }
  }
  @Published var changesOnly = true
@@ -828,7 +828,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
  let library=Library(workflowFile:FileManager.default.temporaryDirectory.appendingPathComponent("MetadataTransfer-Review-" + UUID().uuidString + "/Workflows.json"))
  #else
  let library: Library = {
-  JoongaTagStorage.migratePreferences()
+  JoongaTagStorage.loadSettings()
   return Library()
  }()
  #endif
@@ -836,6 +836,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
  private weak var workflowMenu: NSMenu?
  private var workflowCommandCount = 0
  private var workspaceClosed = false
+ private var uninstalling = false
  private weak var workspaceControl: NSSegmentedControl?
  var window:NSWindow!
  func applicationShouldTerminateAfterLastWindowClosed(_ sender:NSApplication)->Bool { true }
@@ -844,7 +845,15 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDel
  }
  func windowWillClose(_ notification: Notification) { workspaceClosed = true }
  func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-  (workspaceClosed || (window?.attachedSheet == nil && confirmClose())) ? .terminateNow : .terminateCancel
+  (uninstalling || workspaceClosed || (window?.attachedSheet == nil && confirmClose())) ? .terminateNow : .terminateCancel
+ }
+ func uninstall() throws {
+  guard !library.busy, !library.mediaLoading, library.pendingPaths.isEmpty else {
+   throw MacAppUpdater.failure("Save or revert edits and wait for current work to finish first.")
+  }
+  try JoongaTagUninstaller.schedule()
+  uninstalling = true
+  NSApp.terminate(nil)
  }
  private func confirmClose() -> Bool {
   let alert = NSAlert()
