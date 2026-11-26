@@ -24,7 +24,7 @@ internal sealed record ExistingInstall(string InstallLocation, string DisplayVer
 internal static class InstallEngine
 {
     public const string AppName = "Joonga Tag";
-    public const string AppVersion = "0.9.2";
+    public const string AppVersion = "0.9.3";
     public const string Publisher = "Jai Singh Dhaliwal";
     public const string UninstallKeyName = "JoongaTag";
     public const string UninstallSubkey = $@"Software\Microsoft\Windows\CurrentVersion\Uninstall\{UninstallKeyName}";
